@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: polyglot
+  labels:
+    app: auth-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      initContainers:
+        - name: migrate
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-auth -U appuser -d authdb; do
+                echo "waiting for postgres-auth..."
+                sleep 2
+              done
+              psql -h postgres-auth -U appuser -d authdb -c "
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
+                CREATE TABLE IF NOT EXISTS auth_users (
+                  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                  email      TEXT        NOT NULL UNIQUE,
+                  name       TEXT        NOT NULL,
+                  password   TEXT        NOT NULL,
+                  role       TEXT        NOT NULL DEFAULT 'user',
+                  is_active  BOOLEAN     NOT NULL DEFAULT true,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+                CREATE TABLE IF NOT EXISTS refresh_tokens (
+                  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+                  user_id    UUID        NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+                  token      TEXT        NOT NULL UNIQUE,
+                  expires_at TIMESTAMPTZ NOT NULL,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token   ON refresh_tokens(token);
+                CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+              "
+              echo "migrations complete."
+      containers:
+        - name: auth-service
+          image: santonix/auth-service:v1.0.0
+          ports:
+            - containerPort: 3006
+          env:
+            - name: PORT
+              value: "3006"
+            - name: DB_HOST
+              value: "postgres-auth"
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: DB_PORT_POSTGRES
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_NAME_AUTH
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: JWT_SECRET
+            - name: JWT_ALGORITHM
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: JWT_ALGORITHM
+            - name: JWT_EXPIRY_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: JWT_EXPIRY_MINUTES
+            - name: JWT_REFRESH_EXPIRY_DAYS
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: JWT_REFRESH_EXPIRY_DAYS
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3006
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3006
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: polyglot
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - port: 3006
+      targetPort: 3006

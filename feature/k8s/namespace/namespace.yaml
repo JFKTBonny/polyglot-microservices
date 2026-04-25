@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: polyglot
+  labels:
+    app: polyglot-microservices
+    environment: production
