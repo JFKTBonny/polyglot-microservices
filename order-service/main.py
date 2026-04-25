@@ -3,6 +3,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
+from core.circuit_breaker import get_all_stats
 from dotenv import load_dotenv
 
 from db.client import get_pool, close_pool
@@ -61,6 +62,7 @@ async def health():
     return {
         "status": "ok",
         "service": "order-service",
+        "circuit_breakers": get_all_stats()
     }
 
 
@@ -76,3 +78,4 @@ if __name__ == "__main__":
         port=int(os.getenv("PORT", 3002)),
         reload=True   # equivalent of nodemon — auto-restarts on file change
     )
+
