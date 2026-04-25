@@ -1,0 +1,52 @@
+# ── Environment files — never commit secrets ──────
+.env
+.env.*
+!.env.example
+
+# ── Dependencies ──────────────────────────────────
+node_modules/
+vendor/
+target/
+*.class
+
+# ── Build artifacts ───────────────────────────────
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Go binary ─────────────────────────────────────
+inventory-service/inventory-service
+
+# ── Java ──────────────────────────────────────────
+*.jar
+*.war
+*.ear
+payment-service/target/
+
+# ── Laravel ───────────────────────────────────────
+analytics-service/bootstrap/cache/*
+!analytics-service/bootstrap/cache/.gitkeep
+analytics-service/storage/framework/cache/*
+analytics-service/storage/framework/sessions/*
+analytics-service/storage/framework/views/*
+analytics-service/storage/logs/*
+
+# ── Docker ────────────────────────────────────────
+.docker/
+
+# ── IDE ───────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────
+*.log
+
+# ── Go sum (regenerated) ──────────────────────────
+# keep go.sum — it ensures reproducible builds

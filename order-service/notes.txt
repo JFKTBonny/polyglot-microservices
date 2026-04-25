@@ -1,0 +1,13 @@
+requirements.txt observations
+*****************************
+    fastapi — the web framework
+    uvicorn — the ASGI server that runs FastAPI (equivalent of Node's http server)
+    asyncpg — async Postgres driver (faster than psycopg2)
+    python-dotenv — reads .env file
+    httpx — async HTTP client for calling User Service (equivalent of fetch in Node.js)
+
+
+Client
+  ├── POST /users  → User Service (Node.js + Express + PostgreSQL)
+  └── POST /orders → Order Service (Python + FastAPI + MySQL)
+                         └── GET /users/:id → User Service ✓    

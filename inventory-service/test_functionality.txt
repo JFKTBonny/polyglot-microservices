@@ -1,0 +1,26 @@
+# Health check
+curl -s http://localhost:3003/health | jq
+
+# List seeded products
+curl -s http://localhost:3003/products | jq
+
+# Terminal 1 — watch inventory service
+docker compose logs -f inventory-service
+
+# Terminal 2 — create a user then an order using SKU-001
+curl -s -X POST http://localhost:3001/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"david@example.com","name":"David"}' | jq
+
+# Use returned id
+curl -s -X POST http://localhost:3002/orders/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "<id>",
+    "items": [
+      {"product_id": "SKU-001", "name": "Laptop", "quantity": 2, "price": 999.99}
+    ]
+  }' | jq
+
+  # Then verify stock was actually reduced:
+ curl -s http://localhost:3003/products | jq '.data[] | select(.sku == "SKU-001")' 

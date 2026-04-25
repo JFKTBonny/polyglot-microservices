@@ -1,0 +1,24 @@
+# Health checks
+curl http://localhost:3001/health
+curl http://localhost:3002/health
+
+# Create a user first (User Service)
+curl -s -X POST http://localhost:3001/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","name":"Alice"}' | jq
+
+# Create an order using the returned user id
+curl -s -X POST http://localhost:3002/orders/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "<paste-user-id-here>",
+    "items": [
+      {"product_id": "p1", "name": "Laptop", "quantity": 1, "price": 999.99}
+    ]
+  }' | jq
+
+# List orders
+curl -s http://localhost:3002/orders/ | jq
+
+# Interactive docs
+open http://localhost:3002/docs

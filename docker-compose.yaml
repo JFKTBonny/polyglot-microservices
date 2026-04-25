@@ -1,0 +1,236 @@
+
+services:
+
+  user-service:
+    build: ./user-service
+    ports: ["3001:3001"]
+    environment:
+      DATABASE_URL: postgres://appuser:password@postgres:5432/userdb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  order-service:
+    build: ./order-service
+    ports: ["3002:3002"]
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_PASSWORD: password
+      DB_NAME: orderdb
+      USER_SERVICE_URL: http://user-service:3001
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      mysql:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: userdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./user-service/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "appuser", "-d", "userdb"]
+      interval: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: orderdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./order-service/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "appuser", "-ppassword"]
+      interval: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    ports: ["9092:9092", "29092:29092"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      retries: 5
+      timeout: 10s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports: ["8080:8080"]
+    depends_on: [kafka]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092   
+
+  notification-service:
+    build: ./notification-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_GROUP_ID: notification-service
+      PYTHONUNBUFFERED: 1 
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped   
+
+  mariadb:
+    image: mariadb:11.2
+    environment:
+      MARIADB_DATABASE: inventorydb
+      MARIADB_USER: appuser
+      MARIADB_PASSWORD: password
+      MARIADB_ROOT_PASSWORD: rootpassword
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./inventory-service/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 5    
+
+  inventory-service:
+    build: ./inventory-service
+    ports: ["3003:3003"]
+    environment:
+      PORT: 3003
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_PASSWORD: password
+      DB_NAME: inventorydb
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      USER_SERVICE_URL: http://user-service:3001
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped   
+
+  payment-service:
+    build: ./payment-service
+    ports: ["3004:3004"]
+    environment:
+      PORT: 3004
+      DB_HOST: payment-postgres
+      DB_PORT: 5432
+      DB_USER: appuser
+      DB_PASSWORD: password
+      DB_NAME: paymentdb
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ORDER_SERVICE_URL: http://order-service:3002
+    depends_on:
+      payment-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  payment-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: password
+    volumes:
+      - payment_pg_data:/var/lib/postgresql/data
+      - ./payment-service/src/main/resources/db/migration:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "appuser", "-d", "paymentdb"]
+      interval: 5s
+      retries: 5 
+
+  analytics-service:
+    build: ./analytics-service
+    ports: ["3005:3005"]
+    environment:
+      APP_PORT: 3005
+      APP_ENV: production
+      APP_KEY: base64:2fl+Tsg4gJDmXcVLkYFwOkKBBs1JnTpKBWMYBs1JnTp=
+      DB_CONNECTION: pgsql
+      DB_HOST: analytics-postgres
+      DB_PORT: 5432
+      DB_DATABASE: analyticsdb
+      DB_USERNAME: appuser
+      DB_PASSWORD: password
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      analytics-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped   
+
+  analytics-postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: analyticsdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: password
+    volumes:
+      - analytics_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "appuser", "-d", "analyticsdb"]
+      interval: 5s
+      retries: 5   
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./api-gateway/logs:/var/log/nginx
+    depends_on:
+      - user-service
+      - order-service
+      - inventory-service
+      - payment-service
+      - analytics-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 10s
+      retries: 3  
+
+  ui-service:
+    build: ./ui-service
+    ports: ["3000:80"]
+    depends_on:
+      - api-gateway
+    restart: unless-stopped      
+
+volumes:
+  pg_data:
+  mysql_data:
+  mariadb_data:
+  payment_pg_data:
+  analytics_pg_data:
+

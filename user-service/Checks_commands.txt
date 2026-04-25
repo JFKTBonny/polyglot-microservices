@@ -1,0 +1,11 @@
+# Build and start everything
+docker compose up --build
+
+# View logs of a specific service
+docker compose logs -f user-service
+
+# Rebuild only user-service after code changes
+docker compose up --build user-service
+
+# Check container health status
+docker ps --format "table {{.Names}}	{{.Status}}"

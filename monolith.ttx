@@ -1,0 +1,22 @@
+The Monolith
+************
+A monolith runs everything in one process... 
+Your user logic, order logic, payment logic are deployed together, sharing one database, one codebase...
+
+Client  ──▶    MONOLITH [Users · Orders · Products · Payments · Email]  ──▶ One DB
+
+
+Advantages of a monolith: 
+************************
+           - simple to run locally 
+           - easy to debug (one log, one stack trace)
+           - transactions are trivial (same DB)
+           - low latency (in-process calls)
+           - easy to refactor across modules.
+
+Pain points at scale: 
+********************
+           - one team's deployment breaks everyone else's
+           - you can't scale just the payments module
+           - you scale everything, a bug in the email module can crash orders
+           - the codebase becomes unmanageable after 50+ engineers.

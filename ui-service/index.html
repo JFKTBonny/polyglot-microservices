@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microservices Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⬡</div>
+      <div>
+        <h2>Microservices</h2>
+        <span>Dashboard</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">▦</span> Dashboard
+      </a>
+      <a href="#" class="nav-item" data-page="products">
+        <span class="nav-icon">▤</span> Products
+      </a>
+      <a href="#" class="nav-item" data-page="orders">
+        <span class="nav-icon">▧</span> Orders
+      </a>
+      <a href="#" class="nav-item" data-page="payments">
+        <span class="nav-icon">▨</span> Payments
+      </a>
+      <a href="#" class="nav-item" data-page="users">
+        <span class="nav-icon">▩</span> Users
+      </a>
+    </nav>
+
+    <div class="sidebar-status">
+      <div class="status-title">Service Health</div>
+      <div id="health-list"></div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ─────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" id="refresh-btn" onclick="refreshPage()">
+          ↻ Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <div class="content" id="content"></div>
+
+  </main>
+
+  <!-- ── MODAL ─────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modal-title">Create Order</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ── TOAST ─────────────────────────────────────────────────── -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

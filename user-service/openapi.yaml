@@ -1,0 +1,193 @@
+openapi: "3.0.3"
+
+info:
+  title: User Service API
+  description: Manages user accounts. Owns its own database — no other service touches it directly.
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+  - url: http://user-service:3001
+    description: Internal (Docker / Kubernetes)
+
+paths:
+
+  /health:
+    get:
+      summary: Health check
+      description: Used by Kubernetes liveness and readiness probes.
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:    { type: string, example: ok }
+                  service:   { type: string, example: user-service }
+                  uptime:    { type: number, example: 42.3 }
+                  timestamp: { type: string, format: date-time }
+
+  /users:
+    get:
+      summary: List users
+      description: Returns a paginated list of all users, newest first.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+          description: Max number of users to return
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+          description: Number of users to skip
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  limit:  { type: integer }
+                  offset: { type: integer }
+
+    post:
+      summary: Create a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            example:
+              email: alice@example.com
+              name: Alice
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "400":
+          description: Missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: The user UUID
+
+    get:
+      summary: Get user by ID
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update user name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, example: Alice Smith }
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Delete user
+      responses:
+        "204":
+          description: User deleted — no body returned
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        name:
+          type: string
+          example: Alice
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    CreateUserRequest:
+      type: object
+      required: [email, name]
+      properties:
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        name:
+          type: string
+          minLength: 1
+          example: Alice
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: User not found
