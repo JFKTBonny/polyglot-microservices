@@ -1,3 +1,35 @@
+Cricuit breaker
+***************
+          Circuit breaker protect Order service from cascading failures when User service is slow or down...
+## Without circuit breaker
+**************************  
+           Order Service → User Service (if down, Order Service hangs for 3s then fails)
+                            (under load, 100 requests × 3s timeout = system overload)    
+
+## with circuit breaker
+***********************
+            Order Service → Circuit Breaker → User Service
+                    │
+                    ├── CLOSED  → calls pass through normally
+                    ├── OPEN    → calls fail immediately (no timeout wait)
+                    └── HALF-OPEN → one test call, if success → CLOSED    
+
+## States
+*********
+        CLOSED    → normal operation, calls pass through
+                    opens after 5 consecutive failures
+
+        OPEN      → fast fail, no calls made
+                    stays open for 30 seconds
+
+        HALF-OPEN → after 30s, lets one test call through
+                    success → CLOSED
+                    failure → OPEN again                       
+
+########################################################################################################################
+Tests steps:
+***********                                                 
+
 docker compose up --build order-service -d
 
 # Check health — shows circuit breaker state

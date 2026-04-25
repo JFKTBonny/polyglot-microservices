@@ -1,0 +1,163 @@
+1 — Verify all services are healthy
+        curl -s http://localhost:3001/health | jq   # User Service
+        curl -s http://localhost:3002/health | jq   # Order Service
+        curl -s http://localhost:3003/health | jq   # Inventory Service
+        curl -s http://localhost:3004/payments/health | jq  # Payment Service
+
+2 — Create a user (User Service)
+        curl -s -X POST http://localhost:3001/users \
+        -H "Content-Type: application/json" \
+        -d '{"email":"alice@example.com","name":"Alice"}' | jq
+Expected: 201 with user object containing id.
+
+3 — Check products in inventory (Inventory Service)
+        curl -s http://localhost:3003/products | jq
+Expected: 5 seeded products with stock_quantity and available_quantity.
+
+4 — Create an order (Order Service → User Service sync call)
+        curl -s -X POST http://localhost:3002/orders/ \
+        -H "Content-Type: application/json" \
+        -d '{
+            "user_id": "<alice-id>",
+            "items": [
+            {"product_id": "SKU-001", "name": "Laptop", "quantity": 1, "price": 999.99}
+            ]
+        }' | jq
+Expected: 201 with order "status": "pending". This triggers the full async chain.
+
+5 — Verify order.created event was published (Kafka)
+        docker compose exec kafka kafka-console-consumer \
+        --bootstrap-server localhost:9092 \
+        --topic order.created \
+        --from-beginning
+Expected: JSON message with order_id, user_id, total, items.
+
+6 — Verify stock was reserved (Inventory Service)
+
+# Check stock.reserved topic
+        docker compose exec kafka kafka-console-consumer \
+        --bootstrap-server localhost:9092 \
+        --topic stock.reserved \
+        --from-beginning
+Expected: {"order_id":"...","user_id":"...","total":999.99,"status":"reserved"}
+
+# Verify reserved_quantity increased on the product
+        curl -s http://localhost:3003/products | jq '.data[] | select(.sku == "SKU-001")'
+Expected: reserved_quantity increased, available_quantity decreased.
+
+7 — Verify payment was processed (Payment Service)
+        curl -s http://localhost:3004/payments | jq
+Expected: payment record with "status": "completed" or "status": "failed" and correct amount.
+
+# Check payment.processed topic
+        docker compose exec kafka kafka-console-consumer \
+        --bootstrap-server localhost:9092 \
+        --topic payment.processed \
+        --from-beginning
+
+8 — Verify notification was sent (Notification Service)
+        docker compose logs notification-service | grep -E "email|order"
+Expected:
+[email] sending order confirmation to user <id>
+[email] order <order-id> — total $999.99
+[email] ✓ email sent successfully
+
+
+9 — Test order with non-existent user (sync validation)
+        curl -s -X POST http://localhost:3002/orders/ \
+        -H "Content-Type: application/json" \
+        -d '{
+            "user_id": "00000000-0000-0000-0000-000000000000",
+            "items": [
+            {"product_id": "SKU-001", "name": "Laptop", "quantity": 1, "price": 999.99}
+            ]
+        }' | jq
+Expected: 404 User not found — sync call to User Service rejects it before any event is published.
+
+
+10 — Test insufficient stock
+# Try to order more than available
+        curl -s -X POST http://localhost:3002/orders/ \
+        -H "Content-Type: application/json" \
+        -d '{
+            "user_id": "<alice-id>",
+            "items": [
+            {"product_id": "SKU-001", "name": "Laptop", "quantity": 9999, "price": 999.99}
+            ]
+        }' | jq
+Then check:
+# stock.insufficient topic should have a message
+        docker compose exec kafka kafka-console-consumer \
+        --bootstrap-server localhost:9092 \
+        --topic stock.insufficient \
+        --from-beginning
+Expected: {"order_id":"...","status":"insufficient","reason":"insufficient stock for: SKU-001"}
+
+11 — Test stock update (Inventory Service)
+# Get a product id first
+        curl -s http://localhost:3003/products | jq '.data[0].id'
+
+# Add stock
+        curl -s -X PUT http://localhost:3003/products/<id>/stock \
+        -H "Content-Type: application/json" \
+        -d '{"quantity": 50, "action": "add"}' | jq
+Expected: updated product with increased stock_quantity.
+
+12 — Check all Kafka topics
+        docker compose exec kafka kafka-topics \
+        --bootstrap-server localhost:9092 \
+        --list
+Expected:
+__consumer_offsets
+        order.created
+        order.created.dlq
+        stock.reserved
+        stock.insufficient
+        payment.processed
+        payment.failed
+
+13 — Check all consumer groups
+        docker compose exec kafka kafka-consumer-groups \
+        --bootstrap-server localhost:9092 \
+        --list
+Expected:
+        notification-service
+        inventory-service
+        payment-service
+
+# Check lag for each group — LAG should be 0
+        docker compose exec kafka kafka-consumer-groups \
+        --bootstrap-server localhost:9092 \
+        --describe \
+        --group inventory-service
+
+        docker compose exec kafka kafka-consumer-groups \
+        --bootstrap-server localhost:9092 \
+        --describe \
+        --group payment-service
+
+        docker compose exec kafka kafka-consumer-groups \
+        --bootstrap-server localhost:9092 \
+        --describe \
+        --group notification-service
+Expected: LAG=0 for all groups — no unprocessed messages.
+
+14 — Verify data in each database
+# User Service — PostgreSQL
+        docker compose exec postgres psql -U appuser -d userdb \
+        -c "SELECT id, email, name FROM users;"
+
+# Order Service — MySQL
+    docker compose exec mysql mysql -u appuser -ppassword orderdb \
+    -e "SELECT id, user_id, status, total FROM orders;"
+
+# Inventory Service — MariaDB
+        docker compose exec mariadb mariadb -u appuser -ppassword inventorydb \
+        -e "SELECT sku, name, stock_quantity, reserved_quantity FROM products;"
+
+# Payment Service — PostgreSQL
+        docker compose exec payment-postgres psql -U appuser -d paymentdb \
+        -c "SELECT order_id, amount, status FROM payments;"
+
+15 — Open Kafka UI
+http://localhost:8080

@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: polyglot
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      initContainers:
+        - name: migrate
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-analytics -U appuser -d analyticsdb; do
+                echo "waiting for postgres-analytics..."
+                sleep 2
+              done
+              psql -h postgres-analytics -U appuser -d analyticsdb -c "
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                  id         UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+                  event_type VARCHAR(50)   NOT NULL,
+                  order_id   UUID,
+                  user_id    UUID,
+                  amount     DECIMAL(10,2),
+                  status     VARCHAR(50),
+                  payload    JSONB         NOT NULL,
+                  created_at TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                  updated_at TIMESTAMPTZ   NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_analytics_event_type ON analytics_events(event_type);
+                CREATE INDEX IF NOT EXISTS idx_analytics_order_id   ON analytics_events(order_id);
+                CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON analytics_events(created_at);
+                CREATE TABLE IF NOT EXISTS daily_metrics (
+                  id                  BIGSERIAL     PRIMARY KEY,
+                  date                DATE          NOT NULL UNIQUE,
+                  total_orders        INT           NOT NULL DEFAULT 0,
+                  successful_payments INT           NOT NULL DEFAULT 0,
+                  failed_payments     INT           NOT NULL DEFAULT 0,
+                  total_revenue       DECIMAL(12,2) NOT NULL DEFAULT 0,
+                  items_reserved      INT           NOT NULL DEFAULT 0,
+                  created_at          TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                  updated_at          TIMESTAMPTZ   NOT NULL DEFAULT now()
+                );
+              "
+              echo "migrations complete."
+      containers:
+        - name: analytics-service
+          image: santonix/analytics-service:v1.0.0
+          ports:
+            - containerPort: 3005
+          env:
+            - name: APP_PORT
+              value: "3005"
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: APP_ENV
+            - name: APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: APP_KEY
+            - name: DB_CONNECTION
+              value: "pgsql"
+            - name: DB_HOST
+              value: "postgres-analytics"
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: DB_PORT_POSTGRES
+            - name: DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_NAME_ANALYTICS
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: polyglot
+spec:
+  selector:
+    app: analytics-service
+  ports:
+    - port: 3005
+      targetPort: 3005

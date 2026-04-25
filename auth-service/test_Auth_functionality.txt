@@ -1,0 +1,41 @@
+# register
+        curl -s -X POST http://localhost:3006/auth/register \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "Alice",
+            "email": "alice@example.com",
+            "password": "Secret123",
+            "role": "user"
+        }' | jq
+
+# Login
+        curl -s -X POST http://localhost:3006/auth/login \
+        -H "Content-Type: application/json" \
+        -d '{
+            "email": "alice@example.com",
+            "password": "Secret123"
+        }' | jq
+
+# Validate token — use access_token from register response
+        curl -s http://localhost:3006/auth/validate \
+        -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ODhiZTMwYS0wMDkzLTQxOTktYjVmYS0yZDI5YmRjNTQyMzEiLCJlbWFpbCI6ImFsaWNlQGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzc3MDk4NzM1LCJleHAiOjE3NzcxMDA1MzV9.AfchC-3ivVfuMZ0z1zrw-JKpAoyr96l7r7N-0Qf7Tiw" | jq
+
+# Test invalid token
+        curl -s http://localhost:3006/auth/validate \
+        -H "Authorization: Bearer invalidtoken" | jq
+
+# Test weak password
+        curl -s -X POST http://localhost:3006/auth/register \
+        -H "Content-Type: application/json" \
+        -d '{
+            "name": "Bob",
+            "email": "bob@example.com",
+            "password": "weak"
+        }' | jq
+
+# Refresh token
+        curl -s -X POST http://localhost:3006/auth/refresh \
+        -H "Content-Type: application/json" \
+        -d '{
+            "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ODhiZTMwYS0wMDkzLTQxOTktYjVmYS0yZDI5YmRjNTQyMzEiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTc3NzA5ODczNSwiZXhwIjoxNzc3NzAzNTM1fQ.de960EKxBRZd54OFOumWiRY9wWmhs3JWIGe6X52bqXU"
+        }' | jq

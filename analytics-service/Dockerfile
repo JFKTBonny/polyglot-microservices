@@ -37,6 +37,6 @@ EXPOSE 3005
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s \
     CMD php -r "file_get_contents('http://localhost:3005/health');" || exit 1
 
-CMD sh -c "php artisan migrate --force && \
-    php -S 0.0.0.0:3005 -t public  public/index.php & \
+CMD sh -c "php artisan migrate --force --skip-next-id && \
+    php -S 0.0.0.0:3005 -t public public/index.php & \
     php artisan kafka:consume"
