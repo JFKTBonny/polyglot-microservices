@@ -1,0 +1,132 @@
+name: Release — Tag and Publish
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+
+  # ── Create release tag ────────────────────────────────────────
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get next version
+        id: version
+        run: |
+          # Get latest tag
+          LATEST=$(git tag --sort=-version:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            VERSION="v1.0.0"
+          else
+            # Increment patch version
+            MAJOR=$(echo $LATEST | cut -d. -f1 | tr -d v)
+            MINOR=$(echo $LATEST | cut -d. -f2)
+            PATCH=$(echo $LATEST | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Next version: $VERSION"
+
+      - name: Create tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a ${{ steps.version.outputs.version }} \
+            -m "Release ${{ steps.version.outputs.version }}"
+          git push origin ${{ steps.version.outputs.version }}
+
+  # ── Build and push all services with version tag ──────────────
+  release-images:
+    name: Release Images
+    runs-on: ubuntu-latest
+    needs: create-release
+    strategy:
+      matrix:
+        service:
+          - user-service
+          - order-service
+          - inventory-service
+          - payment-service
+          - analytics-service
+          - auth-service
+          - notification-service
+          - api-gateway
+          - ui-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:${{ needs.create-release.outputs.version }}
+            ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Create GitHub Release ─────────────────────────────────────
+  github-release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [create-release, release-images]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          LATEST_TAG=$(git tag --sort=-version:refname | head -2 | tail -1)
+          if [ -z "$LATEST_TAG" ]; then
+            LOG=$(git log --oneline)
+          else
+            LOG=$(git log ${LATEST_TAG}..HEAD --oneline)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          name: Release ${{ needs.create-release.outputs.version }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Docker Images
+            All images published to Docker Hub as `santonix/*:${{ needs.create-release.outputs.version }}`
+
+            ## Services
+            - user-service
+            - order-service
+            - inventory-service
+            - payment-service
+            - analytics-service
+            - auth-service
+            - notification-service
+            - api-gateway
+            - ui-service
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
