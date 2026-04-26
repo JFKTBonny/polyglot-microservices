@@ -566,9 +566,145 @@ document.querySelectorAll('.nav-item').forEach(item => {
   });
 });
 
+
+// ── Token management ───────────────────────────────────────────
+let authToken = null;
+
+function getToken() { return authToken; }
+function setToken(token) { authToken = token; }
+function clearToken() { authToken = null; }
+function isLoggedIn() { return !!authToken; }
+
+// ── Updated api() function ─────────────────────────────────────
+async function api(path, options = {}) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+    const res = await fetch(path, { headers, ...options });
+
+    if (res.status === 401) {
+      clearToken();
+      showLogin();
+      return;
+    }
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || data.error || 'Request failed');
+    return data;
+  } catch (err) {
+    showToast(err.message, 'error');
+    throw err;
+  }
+}
+
+
+// ── Login page ─────────────────────────────────────────────────
+function showLogin() {
+  document.getElementById('content').innerHTML = `
+    <div style="max-width:400px;margin:80px auto;">
+      <div class="card">
+        <div class="card-label" style="font-size:1.2rem;margin-bottom:20px">
+          ⬡ Polyglot Microservices
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="login-email" type="email" placeholder="alice@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="login-password" type="password" placeholder="••••••••">
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-bottom:10px"
+          onclick="doLogin()">Login</button>
+        <button class="btn btn-outline" style="width:100%"
+          onclick="showRegister()">Register</button>
+      </div>
+    </div>
+  `;
+}
+
+function showRegister() {
+  document.getElementById('content').innerHTML = `
+    <div style="max-width:400px;margin:80px auto;">
+      <div class="card">
+        <div class="card-label" style="font-size:1.2rem;margin-bottom:20px">
+          ⬡ Create Account
+        </div>
+        <div class="form-group">
+          <label>Name</label>
+          <input id="reg-name" placeholder="Alice">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="reg-email" type="email" placeholder="alice@example.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input id="reg-password" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number">
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-bottom:10px"
+          onclick="doRegister()">Register</button>
+        <button class="btn btn-outline" style="width:100%"
+          onclick="showLogin()">Back to Login</button>
+      </div>
+    </div>
+  `;
+}
+
+async function doLogin() {
+  const email    = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  try {
+    const data = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    }).then(r => r.json());
+
+    if (data.access_token) {
+      setToken(data.access_token);
+      showToast('Welcome back!', 'success');
+      navigate('dashboard');
+    } else {
+      showToast(data.detail || 'Login failed', 'error');
+    }
+  } catch (err) {
+    showToast('Login failed', 'error');
+  }
+}
+
+async function doRegister() {
+  const name     = document.getElementById('reg-name').value;
+  const email    = document.getElementById('reg-email').value;
+  const password = document.getElementById('reg-password').value;
+  try {
+    const data = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, role: 'user' })
+    }).then(r => r.json());
+
+    if (data.tokens) {
+      setToken(data.tokens.access_token);
+      showToast('Account created!', 'success');
+      navigate('dashboard');
+    } else {
+      showToast(data.detail || 'Registration failed', 'error');
+    }
+  } catch (err) {
+    showToast('Registration failed', 'error');
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────
 checkHealth();
-navigate('dashboard');
 
-// Auto-refresh health every 30 seconds
+// Show login if no token
+if (!isLoggedIn()) {
+  showLogin();
+} else {
+  navigate('dashboard');
+}
+
 setInterval(checkHealth, 30000);
