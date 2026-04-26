@@ -4,14 +4,14 @@ metadata:
   name: api-gateway-ingress
   namespace: polyglot
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
 spec:
   ingressClassName: nginx
   rules:
-    - http:
+    - host: polyglot.local
+      http:
         paths:
           - path: /
             pathType: Prefix

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api-gateway
-          image: santonix/api-gateway:v1.0.0
+          image: santonix/api-gateway:v1.0.2
           ports:
             - containerPort: 80
           readinessProbe:
