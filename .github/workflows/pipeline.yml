@@ -1,0 +1,254 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+    inputs:
+      run-all:
+        description: 'Run all services regardless of changes'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+
+  # ── Detect changed services ───────────────────────────────────
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      user_service:         ${{ steps.changes.outputs.user_service }}
+      order_service:        ${{ steps.changes.outputs.order_service }}
+      inventory_service:    ${{ steps.changes.outputs.inventory_service }}
+      payment_service:      ${{ steps.changes.outputs.payment_service }}
+      analytics_service:    ${{ steps.changes.outputs.analytics_service }}
+      auth_service:         ${{ steps.changes.outputs.auth_service }}
+      notification_service: ${{ steps.changes.outputs.notification_service }}
+      api_gateway:          ${{ steps.changes.outputs.api_gateway }}
+      ui_service:           ${{ steps.changes.outputs.ui_service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            user_service:
+              - 'user-service/**'
+            order_service:
+              - 'order-service/**'
+            inventory_service:
+              - 'inventory-service/**'
+            payment_service:
+              - 'payment-service/**'
+            analytics_service:
+              - 'analytics-service/**'
+            auth_service:
+              - 'auth-service/**'
+            notification_service:
+              - 'notification-service/**'
+            api_gateway:
+              - 'api-gateway/**'
+            ui_service:
+              - 'ui-service/**'
+
+  # ── User Service (Node.js) ────────────────────────────────────
+  user-service:
+    name: User Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.user_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-node-ci.yml
+    with:
+      service-dir: user-service
+      node-version: '20'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Order Service (Python) ────────────────────────────────────
+  order-service:
+    name: Order Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.order_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-python-ci.yml
+    with:
+      service-dir: order-service
+      python-version: '3.12'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Auth Service (Python) ─────────────────────────────────────
+  auth-service:
+    name: Auth Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.auth_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-python-ci.yml
+    with:
+      service-dir: auth-service
+      python-version: '3.12'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Notification Service (Python) ─────────────────────────────
+  notification-service:
+    name: Notification Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.notification_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-python-ci.yml
+    with:
+      service-dir: notification-service
+      python-version: '3.12'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Inventory Service (Go) ────────────────────────────────────
+  inventory-service:
+    name: Inventory Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.inventory_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-go-ci.yml
+    with:
+      service-dir: inventory-service
+      go-version: '1.23'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Payment Service (Java/Maven) ──────────────────────────────
+  payment-service:
+    name: Payment Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.payment_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-java-maven.yml
+    with:
+      service-dir: payment-service
+      java-version: '21'
+      distribution: 'temurin'
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Analytics Service (PHP + Laravel) ────────────────────────
+  analytics-service:
+    name: Analytics Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.analytics_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-php-nginx.yml
+    with:
+      service-dir: analytics-service
+      docker-image-name: santonix/analytics-service
+      is-php-project: true
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── API Gateway (Nginx) ───────────────────────────────────────
+  api-gateway:
+    name: API Gateway
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.api_gateway == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-php-nginx.yml
+    with:
+      service-dir: api-gateway
+      docker-image-name: santonix/api-gateway
+      nginx-config-path: api-gateway/nginx.conf
+      nginx-config-type: full
+      nginx-image: nginx:1.25
+      is-php-project: false
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── UI Service (Static + Nginx) ───────────────────────────────
+  ui-service:
+    name: UI Service
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.ui_service == 'true' ||
+      github.event.inputs.run-all == 'true'
+    uses: ./.github/workflows/reusable-php-nginx.yml
+    with:
+      service-dir: ui-service
+      docker-image-name: santonix/ui-service
+      nginx-config-path: ui-service/nginx.conf
+      nginx-config-type: partial
+      nginx-image: nginx:1.25-alpine
+      is-php-project: false
+      push-to-docker: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'develop') }}
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+  # ── Pipeline Summary ──────────────────────────────────────────
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs:
+      - user-service
+      - order-service
+      - inventory-service
+      - payment-service
+      - analytics-service
+      - auth-service
+      - notification-service
+      - api-gateway
+      - ui-service
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "════════════════════════════════════"
+          echo "  Pipeline Summary"
+          echo "════════════════════════════════════"
+          echo "Branch:  ${{ github.ref_name }}"
+          echo "SHA:     ${{ github.sha }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo ""
+          if [[ "${{ github.ref_name }}" == "develop" || "${{ github.ref_name }}" == "main" ]]; then
+            echo "✅ Images pushed to Docker Hub"
+          else
+            echo "📝 PR/feature branch — no images pushed"
+          fi
+          echo "════════════════════════════════════"

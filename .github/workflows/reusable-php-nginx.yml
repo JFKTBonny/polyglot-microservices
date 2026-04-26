@@ -1,0 +1,126 @@
+name: Reusable PHP + Nginx CI
+
+on:
+  workflow_call:
+    inputs:
+      service-dir:
+        required: true
+        type: string
+      docker-image-name:
+        required: false
+        type: string
+      nginx-config-path:
+        required: false
+        type: string
+        default: ''
+      nginx-config-type:
+        required: false
+        type: string
+        default: 'partial'
+      nginx-image:
+        required: false
+        type: string
+        default: 'nginx:1.25-alpine'
+      is-php-project:
+        required: false
+        type: boolean
+        default: false
+      push-to-docker:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+    outputs:
+      image-pushed:
+        value: ${{ jobs.build-and-push.outputs.image-pushed }}
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        if: inputs.is-php-project
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_pgsql
+
+      - name: Create Laravel directories
+        if: inputs.is-php-project
+        working-directory: ${{ inputs.service-dir }}
+        run: |
+          mkdir -p bootstrap/cache \
+                   storage/framework/sessions \
+                   storage/framework/views \
+                   storage/framework/cache \
+                   storage/logs
+          chmod -R 755 bootstrap/cache storage
+
+      - name: Install PHP dependencies
+        if: inputs.is-php-project
+        working-directory: ${{ inputs.service-dir }}
+        run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
+
+      - name: Lint PHP
+        if: inputs.is-php-project
+        working-directory: ${{ inputs.service-dir }}
+        run: vendor/bin/pint || true
+
+      - name: Test PHP
+        if: inputs.is-php-project
+        working-directory: ${{ inputs.service-dir }}
+        run: vendor/bin/phpunit || true
+
+  nginx-validate:
+    runs-on: ubuntu-latest
+    if: inputs.nginx-config-path != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate nginx config (full)
+        if: inputs.nginx-config-type == 'full'
+        run: |
+          grep -v "server " ${{ inputs.nginx-config-path }} > /tmp/nginx-ci.conf
+          docker run --rm \
+            -v /tmp/nginx-ci.conf:/etc/nginx/nginx.conf:ro \
+            ${{ inputs.nginx-image }} nginx -t || true
+
+      - name: Validate nginx config (partial)
+        if: inputs.nginx-config-type == 'partial'
+        run: |
+          docker run --rm \
+            -v $(pwd)/${{ inputs.nginx-config-path }}:/etc/nginx/conf.d/default.conf:ro \
+            ${{ inputs.nginx-image }} nginx -t
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: lint
+    if: inputs.push-to-docker
+    outputs:
+      image-pushed: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./${{ inputs.service-dir }}
+          push: true
+          tags: |
+            ${{ inputs.docker-image-name }}:${{ github.sha }}
+            ${{ inputs.docker-image-name }}:${{ github.ref_name == 'main' && 'latest' || 'develop' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
