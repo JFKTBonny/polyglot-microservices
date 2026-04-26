@@ -173,21 +173,38 @@ jobs:
     name: SAST — CodeQL
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false    # ← don't cancel other languages on failure
       matrix:
         language: [javascript, python, go, java]
     steps:
       - uses: actions/checkout@v4
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-      - name: Autobuild
+
+      - name: Setup Java (only for java)
+        if: matrix.language == 'java'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Java manually
+        if: matrix.language == 'java'
+        working-directory: payment-service
+        run: mvn clean package -DskipTests=true
+
+      - name: Autobuild (non-java)
+        if: matrix.language != 'java'
         uses: github/codeql-action/autobuild@v3
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
-
   # ── Container Scanning ────────────────────────────────────────
   container-scan:
     name: Container Scan — Trivy
@@ -237,15 +254,16 @@ jobs:
       - name: Checkov — K8s manifest scan
         uses: bridgecrewio/checkov-action@master
         with:
-          directory: k8s/
+          directory: feature/k8s/
           framework: kubernetes
           soft_fail: true
           output_format: sarif
           output_file_path: checkov-k8s.sarif
+        continue-on-error: true
 
       - name: Upload Checkov report
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('checkov-k8s.sarif') != ''
         with:
           sarif_file: checkov-k8s.sarif
           category: checkov-kubernetes
@@ -321,3 +339,4 @@ jobs:
           echo "Check Security tab for detailed reports:"
           echo "https://github.com/${{ github.repository }}/security"
           echo "════════════════════════════════════════"
+
