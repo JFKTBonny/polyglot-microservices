@@ -25,12 +25,28 @@ pipeline {
                 stage('Validate Branch') {
                     steps {
                         script {
-                            def branch = env.BRANCH_NAME ?: sh(
-                                script: "git rev-parse --abbrev-ref HEAD",
-                                returnStdout: true
-                            ).trim()
+                            // Try multiple ways to get branch name
+                            def branch = env.BRANCH_NAME
+                                ?: env.GIT_BRANCH?.replaceFirst('origin/', '')
+                                ?: sh(
+                                    script: "git name-rev --name-only HEAD 2>/dev/null | sed 's|remotes/origin/||'",
+                                    returnStdout: true
+                                ).trim()
+
+                            // Clean up branch name
+                            branch = branch
+                                ?.replaceFirst('refs/heads/', '')
+                                ?.replaceFirst('origin/', '')
+                                ?.trim()
 
                             echo "Validating branch: ${branch}"
+
+                            // Skip validation for detached HEAD (CI systems)
+                            if (branch == 'HEAD' || branch?.startsWith('HEAD~')) {
+                                echo "Detached HEAD detected — skipping branch validation"
+                                env.DETECTED_BRANCH = 'unknown'
+                                return
+                            }
 
                             def valid = (
                                 branch == 'main' ||
@@ -52,24 +68,14 @@ Allowed patterns:
   fix/short-description
   hotfix/short-description
   release/v1.0.0
-
-Rules:
-  - Lowercase only
-  - Hyphens allowed no underscores
-  - Min 3 chars after prefix
-  - Max 50 chars after prefix
-
-Examples:
-  feature/jwt-refresh-token
-  fix/payment-timeout
-  hotfix/critical-auth-bypass
                                 """
                             }
+
+                            env.DETECTED_BRANCH = branch
                             echo "Branch name valid: ${branch}"
                         }
                     }
                 }
-
                 // ── 1.2 Validate Commit Message ───────────────────
                 stage('Validate Commit') {
                     steps {
@@ -180,9 +186,9 @@ Examples:
 ============================================
          PRE-FLIGHT SUMMARY
 ============================================
-Branch:   ${env.BRANCH_NAME}
+Branch:   ${env.DETECTED_BRANCH ?: env.GIT_BRANCH ?: 'unknown'}
 Commit:   ${env.GIT_COMMIT?.take(7)}
-Author:   ${env.GIT_AUTHOR_NAME}
+Author:   ${env.GIT_AUTHOR_NAME ?: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()}
 --------------------------------------------
 Changed Services:
 ${changed.collect { "  -> ${it}" }.join('\n')}
