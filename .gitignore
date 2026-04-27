@@ -48,5 +48,5 @@ Thumbs.db
 # ── Logs ──────────────────────────────────────────
 *.log
 
-# ── Go sum (regenerated) ──────────────────────────
+## ── Go sum (regenerated) ──────────────────────────
 # keep go.sum — it ensures reproducible builds

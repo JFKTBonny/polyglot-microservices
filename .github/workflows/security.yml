@@ -173,18 +173,21 @@ jobs:
     name: SAST — CodeQL
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false    # ← don't cancel other languages on failure
+      fail-fast: false
       matrix:
-        language: [javascript, python, go, java]
+        include:
+          - language: javascript
+            dir: user-service
+          - language: python
+            dir: order-service
+          - language: go
+            dir: inventory-service
+          - language: java
+            dir: payment-service
     steps:
       - uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Setup Java (only for java)
+      - name: Setup Java
         if: matrix.language == 'java'
         uses: actions/setup-java@v4
         with:
@@ -192,12 +195,18 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build Java manually
-        if: matrix.language == 'java'
-        working-directory: payment-service
-        run: mvn clean package -DskipTests=true
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          source-root: ${{ matrix.dir }}
 
-      - name: Autobuild (non-java)
+      - name: Build Java
+        if: matrix.language == 'java'
+        working-directory: ${{ matrix.dir }}
+        run: mvn clean package -DskipTests=true -B
+
+      - name: Autobuild non-Java
         if: matrix.language != 'java'
         uses: github/codeql-action/autobuild@v4
 
@@ -205,6 +214,7 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+
   # ── Container Scanning ────────────────────────────────────────
   container-scan:
     name: Container Scan — Trivy
