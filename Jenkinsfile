@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_USERNAME     = credentials('DOCKER_USERNAME')
-        DOCKER_PASSWORD     = credentials('DOCKER_PASSWORD')
-        SLACK_WEBHOOK       = credentials('SLACK_WEBHOOK')
+        DOCKER_CREDS        = credentials('dockerhub')
+        
         PIPELINE_START_TIME = ''
         CHANGED_SERVICES    = ''
     }
@@ -231,46 +230,42 @@ Action: Fix branch name or commit message
 
     post {
         always {
-            script {
-                def duration = env.PIPELINE_START_TIME
-                    ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
-                    : 0
-                echo "Pipeline duration: ${duration}s"
-                cleanWs()
+            node('built-in') {
+                script {
+                    def duration = env.PIPELINE_START_TIME
+                        ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
+                        : 0
+                    echo "Pipeline duration: ${duration}s"
+                    cleanWs()
+                }
             }
         }
         success {
-            script {
-                slackNotify(
-                    color: '#36a64f',
-                    title: 'Pipeline Passed',
-                    message: "Branch: ${env.BRANCH_NAME}"
-                )
+            node('built-in') {
+                script {
+                    slackNotify(
+                        color: '#36a64f',
+                        title: 'Pipeline Passed',
+                        message: "Branch: ${env.BRANCH_NAME}"
+                    )
+                }
             }
         }
         failure {
-            script {
-                slackNotify(
-                    color: '#cc0000',
-                    title: 'Pipeline Failed',
-                    message: "Branch: ${env.BRANCH_NAME}"
-                )
+            node('built-in') {
+                script {
+                    slackNotify(
+                        color: '#cc0000',
+                        title: 'Pipeline Failed',
+                        message: "Branch: ${env.BRANCH_NAME}"
+                    )
+                }
             }
         }
     }
-
 } // end pipeline
 
 // ── HELPER: Slack Notification ────────────────────────────────
 def slackNotify(Map config) {
-    try {
-        sh """
-            curl -s -X POST '${env.SLACK_WEBHOOK}' \
-                -H 'Content-Type: application/json' \
-                -d '{"text":"*${config.title}*\\n${config.message?.trim()?.replace('\n', '\\n')}"}' \
-                || true
-        """
-    } catch (e) {
-        echo "Slack notification failed: ${e.message}"
-    }
+    echo "NOTIFY: ${config.title} — ${config.message?.trim()}"
 }
