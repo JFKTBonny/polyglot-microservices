@@ -1,0 +1,13 @@
+# Ignore test and example files
+**/*test*
+**/*spec*
+**/*.example
+**/*.sample
+**/__pycache__/**
+**/node_modules/**
+**/vendor/**
+**/myenv/**
+**/.venv/**
+**/target/**
+**/dist/**
+**/build/**

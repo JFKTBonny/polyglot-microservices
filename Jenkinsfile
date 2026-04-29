@@ -42,6 +42,26 @@ pipeline {
             }
         }
 
+        stage('Secret Detection') {
+            steps {
+                script {
+                    def sd = load 'jenkins/stages/secret-detection.groovy'
+                    sd.run()
+                }
+            }
+            post {
+                failure {
+                    script {
+                        def notify = load 'jenkins/helpers/notify.groovy'
+                        notify.stageFailed(
+                            'Secret Detection',
+                            'Secrets detected — rotate credentials immediately'
+                        )
+                    }
+                }
+            }
+        }
+
     } // end stages
 
     post {
