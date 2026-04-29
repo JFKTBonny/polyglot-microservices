@@ -4,7 +4,7 @@
 // Tools: GitLeaks, TruffleHog, custom pattern scan
 // Runs all tools in parallel for speed
 
-def run() {
+def execute() {
     def tools    = load 'jenkins/helpers/tools.groovy'
     def notify   = load 'jenkins/helpers/notify.groovy'
     def pipeline = load 'jenkins/helpers/pipeline.groovy'

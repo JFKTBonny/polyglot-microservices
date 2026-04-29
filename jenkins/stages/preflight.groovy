@@ -3,7 +3,7 @@
 // Detects changed services and sets pipeline context
 // All checks run in parallel — fast, typically under 30s
 
-def run() {
+def execute() {
     def tools    = load 'jenkins/helpers/tools.groovy'
     def notify   = load 'jenkins/helpers/notify.groovy'
     def pipeline = load 'jenkins/helpers/pipeline.groovy'
@@ -255,4 +255,3 @@ except Exception as e:
     notify.pipelineStarted()
 }
 
-return this
