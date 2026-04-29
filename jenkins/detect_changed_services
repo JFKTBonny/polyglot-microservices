@@ -1,0 +1,26 @@
+// Compare current commit to previous
+
+def changedFiles = sh(
+  script: "git diff --name-only HEAD~1 HEAD",
+  returnStdout: true
+).trim()
+
+// Map files to services
+
+def services = [
+  'user-service',
+  'order-service',
+  'inventory-service',
+  'payment-service',
+  'analytics-service',
+  'auth-service',
+  'notification-service',
+  'api-gateway',
+  'ui-service'
+]
+
+// Only build changed services
+
+def changedServices = services.findAll { service ->
+  changedFiles.contains(service)
+}

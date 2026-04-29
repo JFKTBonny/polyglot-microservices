@@ -1,0 +1,28 @@
+Pipeline starts → Slack message:
+  ┌─────────────────────────────────┐
+  │ 🚀 Pipeline Started             │
+  │ Branch:  feature/auth-refresh   │
+  │ Commit:  fix(auth): token expiry│
+  │ Author:  bonny                  │
+  │ Changed: auth-service           │
+  │ URL:     jenkins.company.com/.. │
+  └─────────────────────────────────┘
+
+Pipeline fails → Slack message:
+  ┌─────────────────────────────────┐
+  │ ❌ Pipeline FAILED              │
+  │ Stage:   Secret Detection       │
+  │ Reason:  API key found in code  │
+  │ Branch:  feature/auth-refresh   │
+  │ Author:  bonny                  │
+  │ Fix:     Remove secret, rotate  │
+  └─────────────────────────────────┘
+
+Pipeline passes → Slack message:
+  ┌─────────────────────────────────┐
+  │ ✅ Pipeline PASSED              │
+  │ Branch:  develop                │
+  │ Images:  pushed to Docker Hub   │
+  │ Deploy:  staging updated        │
+  │ Duration: 12m 34s               │
+  └─────────────────────────────────┘

@@ -1,0 +1,11 @@
+stage('Pre-flight') {
+  parallel {
+    stage('Validate Branch') { ... }
+    stage('Validate Commit') { ... }
+    stage('Detect Changes') { ... }
+  }
+  post {
+    always { notifySlack('STARTED') }
+    failure { error "Pre-flight failed — pipeline blocked" }
+  }
+}

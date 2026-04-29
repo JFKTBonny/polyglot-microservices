@@ -1,0 +1,13 @@
+Allowed patterns:
+  main
+  develop
+  feature/short-description
+  fix/short-description
+  hotfix/short-description
+  release/v1.0.0
+
+Blocked patterns:
+  my-branch          ← no prefix
+  Feature/something  ← uppercase
+  feature/           ← no description
+  wip                ← not descriptive

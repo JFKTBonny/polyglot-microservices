@@ -1,0 +1,15 @@
+HARD BLOCKS (pipeline fails immediately):
+  ├── Any secret/credential detected          ← Stage 2
+  ├── CRITICAL CVE in dependencies            ← Stage 3
+  ├── HIGH severity SAST finding              ← Stage 4
+  ├── SonarQube Quality Gate failure          ← Stage 5
+  ├── Unit test failure                       ← Stage 6
+  ├── CRITICAL CVE in container image        ← Stage 8
+  └── OWASP ZAP high severity finding        ← Stage 10
+
+SOFT WARNINGS (pipeline continues, report generated):
+  ├── MEDIUM CVE in dependencies
+  ├── MEDIUM SAST finding
+  ├── Code coverage below threshold
+  ├── HIGH CVE in container (non-critical)
+  └── Checkov policy violations (non-critical)

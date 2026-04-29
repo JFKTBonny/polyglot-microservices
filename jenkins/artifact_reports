@@ -1,0 +1,10 @@
+After pipeline run:
+  ├── gitleaks-report.json
+  ├── bandit-report-{service}.json
+  ├── semgrep-report.json
+  ├── dependency-audit-{service}.json
+  ├── trivy-{service}.sarif
+  ├── zap-report.html
+  ├── sbom-{service}.cyclonedx.json
+  ├── sonar-report.html
+  └── security-summary.html

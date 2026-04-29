@@ -1,0 +1,114 @@
+┌─────────────────────────────────────────────────────────┐
+│                   JENKINS DEVSECOPS PIPELINE            │
+└─────────────────────────────────────────────────────────┘
+
+STAGE 1 — PRE-FLIGHT
+─────────────────────
+  ├── Validate branch naming convention
+  ├── Check commit message format
+  ├── Detect changed services
+  └── Notify pipeline start (Slack/Email)
+
+STAGE 2 — SECRET DETECTION (FAIL FAST)
+────────────────────────────────────────
+  ├── GitLeaks — scan full git history
+  ├── TruffleHog — deep secret scanning
+  └── ❌ BLOCK pipeline if secrets found
+
+STAGE 3 — DEPENDENCY SECURITY AUDIT
+─────────────────────────────────────
+  ├── npm audit (user-service)         HIGH/CRITICAL block
+  ├── pip-audit (order, auth, notify)  HIGH/CRITICAL block
+  ├── govulncheck (inventory-service)  HIGH/CRITICAL block
+  ├── OWASP Dependency Check (payment) CVSS >= 9 block
+  └── composer audit (analytics)       HIGH/CRITICAL block
+
+STAGE 4 — SAST (Static Analysis)
+──────────────────────────────────
+  ├── Bandit (Python services)
+  ├── Semgrep (all languages — OWASP Top 10)
+  ├── ESLint Security Plugin (Node.js)
+  ├── SpotBugs + Find Security Bugs (Java)
+  ├── golangci-lint (Go)
+  └── PHPCS Security Audit (PHP)
+
+STAGE 5 — CODE QUALITY
+───────────────────────
+  ├── SonarQube analysis (all services)
+  ├── Code coverage thresholds
+  ├── Complexity metrics
+  ├── Duplication detection
+  └── Quality Gate — block if fails
+
+STAGE 6 — UNIT & INTEGRATION TESTS
+─────────────────────────────────────
+  ├── user-service      → Jest
+  ├── order-service     → Pytest
+  ├── inventory-service → Go test
+  ├── payment-service   → JUnit/Maven
+  ├── analytics-service → PHPUnit
+  ├── auth-service      → Pytest
+  └── notification-service → Pytest
+
+STAGE 7 — BUILD DOCKER IMAGES
+───────────────────────────────
+  ├── Build only changed services
+  ├── Tag with: git SHA + branch + semver
+  └── Store image digests for scanning
+
+STAGE 8 — CONTAINER SECURITY SCAN
+────────────────────────────────────
+  ├── Trivy — CVE scanning (CRITICAL block)
+  ├── Grype — second opinion scanner
+  ├── Docker Bench Security
+  ├── Hadolint — Dockerfile best practices
+  └── ❌ BLOCK if CRITICAL CVEs found
+
+STAGE 9 — INFRASTRUCTURE SECURITY
+────────────────────────────────────
+  ├── Checkov — K8s manifests (CIS benchmark)
+  ├── Kubesec — Kubernetes security scoring
+  ├── kube-score — K8s best practices
+  ├── Checkov — Docker Compose
+  └── OPA/Conftest — policy as code
+
+STAGE 10 — DAST (Dynamic Analysis)
+─────────────────────────────────────
+  ├── Spin up services in Docker Compose
+  ├── OWASP ZAP — active scan all endpoints
+  ├── Nuclei — vulnerability templates
+  ├── API fuzzing (auth endpoints)
+  └── Tear down test environment
+
+STAGE 11 — COMPLIANCE & REPORTING
+────────────────────────────────────
+  ├── Generate SBOM (Software Bill of Materials)
+  │     └── Syft — CycloneDX format
+  ├── Aggregate all security reports
+  ├── Publish to DefectDojo (vulnerability mgmt)
+  ├── Generate HTML security report
+  └── Archive all artifacts
+
+STAGE 12 — PUSH TO REGISTRY
+──────────────────────────────
+  ├── Only if ALL security gates pass
+  ├── Only on develop/main branches
+  ├── Push to Docker Hub
+  ├── Sign images (Docker Content Trust)
+  └── Update image tags in K8s manifests
+
+STAGE 13 — DEPLOY
+───────────────────
+  ├── develop → staging namespace
+  ├── main    → production namespace
+  ├── kubectl apply all manifests
+  ├── Wait for rollout completion
+  └── Smoke tests post-deploy
+
+STAGE 14 — POST-DEPLOY VERIFICATION
+──────────────────────────────────────
+  ├── Health check all endpoints
+  ├── Verify JWT authentication works
+  ├── Test Kafka event chain
+  ├── Check all pods Running
+  └── Notify success/failure (Slack/Email)

@@ -1,0 +1,26 @@
+Conventional Commits standard:
+
+type(scope): description
+
+Types allowed:
+feat → new feature
+fix → bug fix
+docs → documentation
+style → formatting
+refactor → code restructure
+test → adding tests
+chore → maintenance
+ci → pipeline changes
+security → security fix
+
+Examples:
+feat(order-service): add circuit breaker
+fix(auth): fix token expiry calculation
+security(payment): patch CVE-2024-1234
+ci(jenkins): add DAST stage
+
+Blocked:
+"fixed stuff" ← no type
+"WIP" ← not descriptive
+"asdfgh" ← meaningless
+"test" ← too vague
