@@ -26,16 +26,15 @@ pipeline {
             steps {
                 script {
                     def pf = load 'jenkins/stages/preflight.groovy'
-                    pf.run()
+                    pf.execute()
                 }
             }
             post {
                 failure {
                     script {
-                        def notify = load 'jenkins/helpers/notify.groovy'
-                        notify.stageFailed(
-                            'Pre-flight',
-                            'Branch name or commit message invalid'
+                        notify(
+                            'Pre-flight Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nFix branch name or commit message"
                         )
                     }
                 }
@@ -46,16 +45,15 @@ pipeline {
             steps {
                 script {
                     def sd = load 'jenkins/stages/secret-detection.groovy'
-                    sd.run()
+                    sd.execute()
                 }
             }
             post {
                 failure {
                     script {
-                        def notify = load 'jenkins/helpers/notify.groovy'
-                        notify.stageFailed(
-                            'Secret Detection',
-                            'Secrets detected — rotate credentials immediately'
+                        notify(
+                            'CRITICAL — Secrets Detected',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nRotate credentials immediately"
                         )
                     }
                 }
@@ -79,20 +77,40 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def notify = load 'jenkins/helpers/notify.groovy'
-                    notify.pipelineSucceeded()
+                    notify(
+                        'Pipeline Passed',
+                        "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nAuthor: ${env.GIT_AUTHOR ?: 'unknown'}"
+                    )
                 }
             }
         }
         failure {
             node('built-in') {
                 script {
-                    def notify = load 'jenkins/helpers/notify.groovy'
-                    notify.pipelineFailed()
+                    notify(
+                        'Pipeline Failed',
+                        "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}"
+                    )
                 }
             }
         }
     }
+
+} // end pipeline
+
+// ── Inline notify — no load() needed ─────────────────────────
+// load() requires workspace — not available in post{}
+// All post{} notifications use this inline function
+def notify(String title, String message) {
+    echo """
+════════════════════════════════════
+  ${title}
+════════════════════════════════════
+${message?.trim()}
+════════════════════════════════════
+    """
+    // Slack — uncomment when webhook configured
+    // sh "curl -s -X POST '${env.SLACK_WEBHOOK}' ..."
 }
 
 
