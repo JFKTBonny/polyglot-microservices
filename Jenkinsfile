@@ -26,6 +26,7 @@ pipeline {
             steps {
                 script {
                     try {
+                        def state = load 'jenkins/helpers/state.groovy'
                         def gitInfo = sh(
                             returnStdout: true,
                             script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
@@ -160,13 +161,13 @@ Commit : ${env.SHORT_COMMIT}
 // 🔧 SAFE HELPERS
 // =======================
 
-def safeUnstash() {
-    try {
-        unstash 'pipeline-state'
-    } catch (err) {
-        echo "No stash found (pipeline likely failed early)"
-    }
-}
+// def safeUnstash() {
+//     try {
+//         unstash 'pipeline-state'
+//     } catch (err) {
+//         echo "No stash found (pipeline likely failed early)"
+//     }
+// }
 
 def safeState() {
     try {
