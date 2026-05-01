@@ -2,38 +2,59 @@ def execute() {
     def pipeline = load 'jenkins/helpers/pipeline.groovy'
 
     pipeline.banner('Stage 2 - Secret Detection')
+    
 
-    // ── 2.1 GitLeaks ──────────────────────────────────────────
-    stage('GitLeaks') {
-        echo "Running GitLeaks..."
+// ── 2.1 GitLeaks ──────────────────────────────────────────
+stage('GitLeaks') {
+    echo "Running GitLeaks..."
 
-        writeFile file: 'install-gitleaks.sh', text: '''#!/bin/bash
+    writeFile file: 'install-gitleaks.sh', text: '''#!/bin/bash
+set -e
+
 if ! command -v gitleaks &>/dev/null; then
     echo "Installing gitleaks..."
+
+    TMP_DIR=$(mktemp -d)
+    cd $TMP_DIR
+
     curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
-        | tar -xz -C /tmp 2>/dev/null || true
-    sudo mv /tmp/gitleaks /usr/local/bin/gitleaks 2>/dev/null || \
-    mv /tmp/gitleaks ./gitleaks 2>/dev/null || true
+        | tar -xz
+
+    chmod +x gitleaks
+
+    # install locally first (safe for Jenkins agents)
+    mkdir -p $HOME/bin
+    mv gitleaks $HOME/bin/gitleaks
+
+    export PATH="$HOME/bin:$PATH"
+
+    echo "Installed gitleaks to $HOME/bin/gitleaks"
 fi
+
+gitleaks version
 echo "gitleaks ready"
 '''
-        sh 'bash install-gitleaks.sh && rm -f install-gitleaks.sh'
+    sh 'bash install-gitleaks.sh && rm -f install-gitleaks.sh'
 
-        writeFile file: 'run-gitleaks.sh', text: '''#!/bin/bash
+    writeFile file: 'run-gitleaks.sh', text: '''#!/bin/bash
+set -e
+
 gitleaks detect \
     --source . \
     --report-format json \
     --report-path gitleaks-report.json \
     --redact \
-    --no-git \
-    2>&1 || true
+    || true
 '''
-        sh 'bash run-gitleaks.sh && rm -f run-gitleaks.sh'
+    sh 'bash run-gitleaks.sh && rm -f run-gitleaks.sh'
 
-        pipeline.checkSecretReport('gitleaks-report.json', 'GitLeaks')
-        pipeline.archiveReport('gitleaks-report.json')
-        echo "GitLeaks passed"
-    }
+    pipeline.checkSecretReport('gitleaks-report.json', 'GitLeaks')
+    pipeline.archiveReport('gitleaks-report.json')
+
+    echo "GitLeaks passed"
+}
+
+
 
     // ── 2.2 TruffleHog ────────────────────────────────────────
     stage('TruffleHog') {

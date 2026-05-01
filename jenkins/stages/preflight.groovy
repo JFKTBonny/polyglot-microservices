@@ -1,6 +1,14 @@
+def state = load 'jenkins/helpers/state.groovy'
+def s = state.load()
+
+echo "Branch:   ${s.branch}"
+echo "Commit:   ${s.commit}"
+echo "Author:   ${s.author}"
+
 def execute() {
     def tools    = load 'jenkins/helpers/tools.groovy'
     def pipeline = load 'jenkins/helpers/pipeline.groovy'
+    
 
     pipeline.banner('Stage 1 - Pre-flight')
     tools.printVersions()
