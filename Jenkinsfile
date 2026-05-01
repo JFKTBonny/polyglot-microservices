@@ -156,13 +156,25 @@ Commit : ${env.SHORT_COMMIT}
 
 } // end pipeline
 
-// ── HELPERS ───────────────────────────────────────────────────
+// =======================
+// 🔧 SAFE HELPERS
+// =======================
+
+def safeUnstash() {
+    try {
+        unstash 'pipeline-state'
+    } catch (err) {
+        echo "No stash found (pipeline likely failed early)"
+    }
+}
+
 def safeState() {
-    return [
-        branch: env.DETECTED_BRANCH ?: 'unknown',
-        commit: env.SHORT_COMMIT    ?: 'unknown',
-        author: env.GIT_AUTHOR      ?: 'unknown'
-    ]
+    try {
+        def state = load 'jenkins/helpers/state.groovy'
+        return state.load()
+    } catch (err) {
+        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
+    }
 }
 
 def notify(String title, String message) {
@@ -172,9 +184,8 @@ def notify(String title, String message) {
 ════════════════════════════════════
 ${message?.trim()}
 ════════════════════════════════════
-    """
+"""
 }
-
 
 
 
