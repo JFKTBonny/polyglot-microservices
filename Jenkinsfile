@@ -125,21 +125,24 @@ Commit : ${env.SHORT_COMMIT}
             }
         }
         success {
-            script {
-                def s = safeState()
-                notify(
-                    'Pipeline Passed',
-                    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}"
-                )
+            node('built-in') {
+                script{
+                    def s = safeState()
+                    notify{
+                        'Pipeline Passed',
+                    }    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}"
+                }
             }
-        }
-        failure {
-            script {
-                def s = safeState()
-                notify(
-                    'Pipeline Failed',
-                    "Branch: ${s.branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${s.author}"
-                )
+        } 
+        failue {
+            node('built-in') {
+                script {
+                        def s = safeState()
+                        notify(
+                            'Pipeline Failed',
+                            "Branch: ${s.branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${s.author}"
+                        )
+                }
             }
         }
     }
