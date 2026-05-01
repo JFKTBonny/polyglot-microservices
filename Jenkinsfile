@@ -19,13 +19,23 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    def config = [:]
-                    load 'jenkins/stages/init.groovy'.call(config)
+                    try {
+                        def config = [:]
 
-                    // Persist state across nodes
-                    stash name: 'pipeline-state', includes: 'jenkins/state/*'
+                        def initStage = load 'jenkins/stages/init.groovy'
+                        initStage.call(config)
 
-                    env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+                        // stash only if file exists
+                        if (fileExists('jenkins/state/pipeline-meta.json')) {
+                            stash name: 'pipeline-state', includes: 'jenkins/state/*'
+                        }
+
+                        env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+
+                    } catch (err) {
+                        env.FAILED_STAGE = "Init"
+                        throw err
+                    }
                 }
             }
         }
@@ -33,18 +43,22 @@ pipeline {
         stage('Pre-flight') {
             steps {
                 script {
-                    def pf = load 'jenkins/stages/preflight.groovy'
-                    pf.execute()
+                    try {
+                        def pf = load 'jenkins/stages/preflight.groovy'
+                        pf.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = "Pre-flight"
+                        throw err
+                    }
                 }
             }
             post {
                 failure {
                     script {
-                        def s = getState()
+                        def s = safeState()
                         notify(
                             'Pre-flight Failed',
-                            """Branch: ${s.branch ?: 'unknown'}
-Fix branch name or commit message"""
+                            "Branch: ${s.branch}\nFix branch name or commit message"
                         )
                     }
                 }
@@ -54,39 +68,41 @@ Fix branch name or commit message"""
         stage('Secret Detection') {
             steps {
                 script {
-                    def sd = load 'jenkins/stages/secret-detection.groovy'
-                    sd.execute()
+                    try {
+                        def sd = load 'jenkins/stages/secret-detection.groovy'
+                        sd.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = "Secret Detection"
+                        throw err
+                    }
                 }
             }
             post {
                 failure {
                     script {
-                        def s = getState()
+                        def s = safeState()
                         notify(
                             'CRITICAL — Secrets Detected',
-                            """Branch: ${s.branch ?: 'unknown'}
-Rotate credentials immediately"""
+                            "Branch: ${s.branch}\nRotate credentials immediately"
                         )
                     }
                 }
             }
         }
 
-    } // end stages
+    }
 
     post {
         always {
             node('built-in') {
                 script {
-                    // Restore state if needed
-                    unstash 'pipeline-state'
+                    safeUnstash()
 
                     def duration = env.PIPELINE_START_TIME
                         ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
                         : 0
 
                     echo "Pipeline duration: ${duration}s"
-
                     cleanWs()
                 }
             }
@@ -95,14 +111,14 @@ Rotate credentials immediately"""
         success {
             node('built-in') {
                 script {
-                    unstash 'pipeline-state'
-                    def s = getState()
+                    safeUnstash()
+                    def s = safeState()
 
                     notify(
                         'Pipeline Passed',
-                        """Branch: ${s.branch ?: 'unknown'}
-Author: ${s.author ?: 'unknown'}
-Commit: ${s.commit ?: 'unknown'}"""
+                        """Branch: ${s.branch}
+Author: ${s.author}
+Commit: ${s.commit}"""
                     )
                 }
             }
@@ -111,30 +127,41 @@ Commit: ${s.commit ?: 'unknown'}"""
         failure {
             node('built-in') {
                 script {
-                    unstash 'pipeline-state'
-                    def s = getState()
+                    safeUnstash()
+                    def s = safeState()
 
                     notify(
                         'Pipeline Failed',
-                        """Branch: ${s.branch ?: 'unknown'}
-Failed Stage: ${env.FAILED_STAGE ?: 'unknown'}
-Author: ${s.author ?: 'unknown'}"""
+                        """Branch: ${s.branch}
+Failed Stage: ${env.FAILED_STAGE}
+Author: ${s.author}"""
                     )
                 }
             }
         }
     }
-
-} // end pipeline
+}
 
 
 // =======================
-// 🔧 HELPERS
+// 🔧 SAFE HELPERS
 // =======================
 
-def getState() {
-    def state = load 'jenkins/helpers/state.groovy'
-    return state.load()
+def safeUnstash() {
+    try {
+        unstash 'pipeline-state'
+    } catch (err) {
+        echo "No stash found (pipeline likely failed early)"
+    }
+}
+
+def safeState() {
+    try {
+        def state = load 'jenkins/helpers/state.groovy'
+        return state.load()
+    } catch (err) {
+        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
+    }
 }
 
 def notify(String title, String message) {
@@ -144,5 +171,5 @@ def notify(String title, String message) {
 ════════════════════════════════════
 ${message?.trim()}
 ════════════════════════════════════
-    """
+"""
 }
