@@ -67,3 +67,6 @@ Organizational Considerations
      * Conway's Law: Your architecture will mirror your team structure...[ design teams around services...]
      * Domain-Driven Design(DDD): Use Bounded Contexts to define service boundaries correctly...
      * Team ownership: Each team fully owns their service( buils, deploy,operate)...                                           
+
+
+##

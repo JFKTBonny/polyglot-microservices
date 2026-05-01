@@ -13,9 +13,9 @@ Services: ${env.CHANGED_SERVICES ?: 'none'}
 
 def pipelineSucceeded() {
     send('Pipeline Passed', """
-Branch: ${env.DETECTED_BRANCH ?: 'unknown'}
-Author: ${env.GIT_AUTHOR ?: 'unknown'}
-Commit: ${env.SHORT_COMMIT ?: 'unknown'}
+Branch: ${env.PIPELINE_BRANCH}
+Author: ${env.PIPELINE_AUTHOR}
+Commit: ${env.PIPELINE_COMMIT}
     """)
 }
 
