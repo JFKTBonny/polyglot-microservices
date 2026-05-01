@@ -135,23 +135,16 @@ pipeline {
     // =======================
     post {
 
-        
-
         success {
             node('built-in') {
                 script {
-                   
-
-                    
-
-                    def s = state.load()
+                    def s = safeState()
 
                     notify(
                         'Pipeline Passed',
-
-                    """Branch: ${s.branch}                      
-                       Author: ${s.author}
-                       Commit: ${s.commit}"""
+                        """Branch: ${s.branch}
+    Author: ${s.author}
+    Commit: ${s.commit}"""
                     )
                 }
             }
@@ -160,19 +153,13 @@ pipeline {
         failure {
             node('built-in') {
                 script {
-                    
-                   
-                   
-                   
-
-                    def s = state.load()
+                    def s = safeState()
 
                     notify(
                         'Pipeline Failed',
-
                         """Branch: ${s.branch}
-                            Failed Stage: ${env.FAILED_STAGE}
-                            Author: ${s.author}"""
+    Failed Stage: ${env.FAILED_STAGE}
+    Author: ${s.author}"""
                     )
                 }
             }
@@ -186,7 +173,9 @@ pipeline {
                         : 0
 
                     echo "Pipeline duration: ${duration}s"
-                    // cleanWs()
+
+                    // ✅ CLEAN LAST
+                    cleanWs()
                 }
             }
         }
