@@ -25,7 +25,6 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Use withCredentials-safe approach
                     def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
                     def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
                     def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
@@ -36,11 +35,12 @@ pipeline {
                     echo "RAW author: '${rawAuthor}'"
                     echo "RAW commit: '${rawShort}'"
 
-                    env.DETECTED_BRANCH = (rawBranch && rawBranch != 'HEAD') ? rawBranch : (env.GIT_BRANCH?.replaceFirst('origin/', '') ?: env.JOB_NAME?.tokenize('/')?.last() ?: 'unknown')
-                    env.GIT_AUTHOR      = rawAuthor ?: 'unknown'
-                    env.GIT_AUTHOR_EMAIL = rawEmail ?: 'unknown'
-                    env.SHORT_COMMIT    = rawShort ?: 'unknown'
-                    env.FULL_COMMIT     = rawFull ?: 'unknown'
+                    // Assign directly — no ternary
+                    env.DETECTED_BRANCH     = rawBranch
+                    env.GIT_AUTHOR          = rawAuthor
+                    env.GIT_AUTHOR_EMAIL    = rawEmail
+                    env.SHORT_COMMIT        = rawShort
+                    env.FULL_COMMIT         = rawFull
                     env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
 
                     echo "Branch:  ${env.DETECTED_BRANCH}"
