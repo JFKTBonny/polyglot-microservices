@@ -6,7 +6,7 @@ pipeline {
         PIPELINE_START_TIME = ''
         FAILED_STAGE        = ''
 
-        // ✅ SAFE cross-stage metadata
+        // ✅ SAFE cross‑stage metadata
         DETECTED_BRANCH = ''
         SHORT_COMMIT    = ''
         GIT_AUTHOR      = ''
@@ -23,7 +23,6 @@ pipeline {
     }
 
     stages {
-
         // =======================
         // INIT
         // =======================
@@ -32,12 +31,10 @@ pipeline {
                 script {
                     try {
                         def config = [:]
-
                         def initStage = load 'jenkins/stages/init.groovy'
                         initStage.call(config)
 
                         env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
-
                     } catch (err) {
                         env.FAILED_STAGE = "Init"
                         throw err
@@ -136,13 +133,12 @@ Author : ${env.GIT_AUTHOR}
             }
         }
 
-        stage('Cleanup') {
-            steps {
-                cleanWs()
-            }
-        }
+        // Stage is gone; use post/cleanWs below instead
     }
 
+    // =======================
+    // POST
+    // =======================
     post {
         success {
             script {
@@ -150,8 +146,8 @@ Author : ${env.GIT_AUTHOR}
                 notify(
                     'Pipeline Passed',
                     """Branch: ${s.branch}
-    Author: ${s.author}
-    Commit: ${s.commit}"""
+Author: ${s.author}
+Commit: ${s.commit}"""
                 )
             }
         }
@@ -162,65 +158,23 @@ Author : ${env.GIT_AUTHOR}
                 notify(
                     'Pipeline Failed',
                     """Branch: ${s.branch}
-    Failed Stage: ${env.FAILED_STAGE}
-    Author: ${s.author}"""
-                )
-                }
-        }
-    }
-}
-
-    // =======================
-    // POST
-    // =======================
-    post {
-
-        success {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Passed',
-                        """Branch: ${s.branch}
-Author: ${s.author}
-Commit: ${s.commit}"""
-                    )
-                }
-            }
-        }
-
-        failure {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Failed',
-                        """Branch: ${s.branch}
 Failed Stage: ${env.FAILED_STAGE}
 Author: ${s.author}"""
-                    )
-                }
+                )
             }
         }
 
         always {
             script {
                 try {
-                    node('built-in') {
-                        if (pwd()) {   // ✅ ensures workspace exists
-                            cleanWs()
-                        }
-                    }
+                    cleanWs()  // no `node('built-in')` needed here; `cleanWs()` already runs on agent
                 } catch (err) {
-                    echo "Workspace cleanup skipped (no node context available)"
+                    echo "Workspace cleanup skipped: ${err}"
                 }
             }
         }
     }
 }
-
 
 // =======================
 // 🔧 SAFE HELPERS
@@ -243,8 +197,6 @@ ${message?.trim()}
 ════════════════════════════════════
 """
 }
-
-
 
 
 
