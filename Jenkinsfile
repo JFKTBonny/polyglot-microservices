@@ -25,51 +25,25 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // For regular Pipeline jobs — get branch from remote refs
-                    def branch = sh(
-                        script: """
-                            git name-rev --name-only HEAD 2>/dev/null \
-                                | sed 's|remotes/origin/||' \
-                                | sed 's|~.*||' \
-                                | sed 's|\\^.*||' \
-                                || echo 'unknown'
-                        """,
+                    // Debug — test each command directly
+                    sh "echo 'PWD:' && pwd"
+                    sh "echo 'GIT DIR:' && ls -la .git 2>/dev/null || echo 'no .git'"
+                    sh "echo 'GIT LOG:' && git log -1 2>/dev/null || echo 'git log failed'"
+                    sh "echo 'GIT BRANCH:' && git branch 2>/dev/null || echo 'git branch failed'"
+                    sh "echo 'ENV BRANCH_NAME:' && echo '${env.BRANCH_NAME}'"
+                    sh "echo 'ENV GIT_BRANCH:' && echo '${env.GIT_BRANCH}'"
+                    sh "echo 'ENV GIT_COMMIT:' && echo '${env.GIT_COMMIT}'"
+                    sh "echo 'ENV JOB_NAME:' && echo '${env.JOB_NAME}'"
+
+                    // Try reading directly
+                    def author = sh(
+                        script: "git log -1 --pretty=%an",
                         returnStdout: true
-                    ).trim()
-
-                    // Fallback to job name if git fails
-                    if (!branch || branch == 'HEAD' || branch == 'undefined') {
-                        branch = env.JOB_NAME?.tokenize('/')?.last() ?: 'unknown'
-                    }
-
-                    env.DETECTED_BRANCH = branch
-
-                    env.GIT_AUTHOR = sh(
-                        script: "git log -1 --pretty=%an 2>/dev/null || echo 'unknown'",
-                        returnStdout: true
-                    ).trim()
-
-                    env.GIT_AUTHOR_EMAIL = sh(
-                        script: "git log -1 --pretty=%ae 2>/dev/null || echo 'unknown'",
-                        returnStdout: true
-                    ).trim()
-
-                    env.SHORT_COMMIT = sh(
-                        script: "git log -1 --pretty=%h 2>/dev/null || echo 'unknown'",
-                        returnStdout: true
-                    ).trim()
-
-                    env.FULL_COMMIT = sh(
-                        script: "git log -1 --pretty=%H 2>/dev/null || echo 'unknown'",
-                        returnStdout: true
-                    ).trim()
+                    )
+                    echo "RAW author output: '${author}'"
+                    echo "TRIMMED: '${author?.trim()}'"
 
                     env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
-
-                    echo "Branch:  ${env.DETECTED_BRANCH}"
-                    echo "Author:  ${env.GIT_AUTHOR}"
-                    echo "Commit:  ${env.SHORT_COMMIT}"
-                    echo "Email:   ${env.GIT_AUTHOR_EMAIL}"
                 }
             }
         }
