@@ -19,7 +19,10 @@ def call(config) {
     config.full   = gitInfo[3]
     config.start  = System.currentTimeMillis()
 
-    // ✅ Persist to file (important)
+    // ✅ ensure directory exists
+    sh 'mkdir -p jenkins/state'
+
+    // ✅ save state
     state.save(config)
 
     echo """

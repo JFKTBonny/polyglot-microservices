@@ -1,17 +1,25 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
-def FILE = "jenkins/state/pipeline-meta.json"
+def getFile() {
+    return "jenkins/state/pipeline-meta.json"
+}
 
 def save(Map data) {
-    writeFile file: FILE, text: JsonOutput.prettyPrint(JsonOutput.toJson(data))
+    def file = getFile()
+
+    writeFile file: file,
+        text: JsonOutput.prettyPrint(JsonOutput.toJson(data))
 }
 
 def load() {
-    if (!fileExists(FILE)) {
+    def file = getFile()
+
+    if (!fileExists(file)) {
         return [:]
     }
-    return new JsonSlurper().parseText(readFile(FILE))
+
+    return new JsonSlurper().parseText(readFile(file))
 }
 
 return this
