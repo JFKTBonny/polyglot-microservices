@@ -376,22 +376,13 @@ pipeline {
 // 🔧 SAFE HELPERS (FIXED)
 // =======================
 
+
 def safeState() {
     try {
         def state = load 'jenkins/helpers/state.groovy'
-        def s = state.load()
-
-        return [
-            branch: s.branch ?: env.GIT_BRANCH ?: 'unknown',
-            author: s.author ?: env.GIT_AUTHOR ?: 'unknown',
-            commit: s.commit ?: env.SHORT_COMMIT ?: 'unknown'
-        ]
+        return state.load()
     } catch (err) {
-        return [
-            branch: env.GIT_BRANCH ?: 'unknown',
-            author: env.GIT_AUTHOR ?: 'unknown',
-            commit: env.SHORT_COMMIT ?: 'unknown'
-        ]
+        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
     }
 }
 
