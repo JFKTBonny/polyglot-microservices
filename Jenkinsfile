@@ -22,30 +22,53 @@ pipeline {
 
     stages {
 
+
+
         stage('Init') {
             steps {
                 script {
+                    // Test simple assignment
+                    env.TEST_VAR = "hello_world"
+                    echo "TEST_VAR: ${env.TEST_VAR}"
+
+                    // Test with rawBranch value
+                    env.TEST_BRANCH = rawBranch
+                    echo "TEST_BRANCH: ${env.TEST_BRANCH}"
+
                     def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
                     def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
                     def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
                     def rawFull   = sh(returnStdout: true, script: 'git log -1 --pretty=format:%H || true').trim()
-                    def rawBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD 2>/dev/null | sed "s|remotes/origin/||" | sed "s|~.*||" || true').trim()
+                    def rawBranch = sh(returnStdout: true, script: '''
+                        git name-rev --name-only HEAD 2>/dev/null \
+                            | sed "s|remotes/origin/||" \
+                            | sed "s|~.*||" \
+                            || true
+                    ''').trim()
 
                     echo "RAW branch: '${rawBranch}'"
                     echo "RAW author: '${rawAuthor}'"
                     echo "RAW commit: '${rawShort}'"
 
-                    // Assign directly — no ternary
-                    env.DETECTED_BRANCH     = rawBranch
-                    env.GIT_AUTHOR          = rawAuthor
-                    env.GIT_AUTHOR_EMAIL    = rawEmail
-                    env.SHORT_COMMIT        = rawShort
-                    env.FULL_COMMIT         = rawFull
-                    env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+                    // Use currentBuild.description as workaround
+                    // and store in global binding
+                    binding.variables.PIPELINE_BRANCH  = rawBranch
+                    binding.variables.PIPELINE_AUTHOR  = rawAuthor
+                    binding.variables.PIPELINE_EMAIL   = rawEmail
+                    binding.variables.PIPELINE_COMMIT  = rawShort
+                    binding.variables.PIPELINE_FULL    = rawFull
+                    binding.variables.PIPELINE_START   = System.currentTimeMillis().toString()
 
-                    echo "Branch:  ${env.DETECTED_BRANCH}"
-                    echo "Author:  ${env.GIT_AUTHOR}"
-                    echo "Commit:  ${env.SHORT_COMMIT}"
+                    env.PIPELINE_BRANCH  = rawBranch
+                    env.PIPELINE_AUTHOR  = rawAuthor
+                    env.PIPELINE_EMAIL   = rawEmail
+                    env.PIPELINE_COMMIT  = rawShort
+                    env.PIPELINE_FULL    = rawFull
+                    env.PIPELINE_START   = System.currentTimeMillis().toString()
+
+                    echo "Branch:  ${env.PIPELINE_BRANCH}"
+                    echo "Author:  ${env.PIPELINE_AUTHOR}"
+                    echo "Commit:  ${env.PIPELINE_COMMIT}"
                 }
             }
         }
