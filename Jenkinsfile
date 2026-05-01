@@ -142,13 +142,7 @@ pipeline {
                 script {
                    
 
-                    def meta = [
-                        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
-                        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
-                        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-                    ]
-
-                    state.save(meta)
+                    
 
                     def s = state.load()
 
@@ -167,14 +161,9 @@ pipeline {
             node('built-in') {
                 script {
                     
-
-                    def meta = [
-                        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
-                        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
-                        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-                    ]
-
-                    state.save(meta)
+                   
+                   
+                   
 
                     def s = state.load()
 
