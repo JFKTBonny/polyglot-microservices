@@ -197,7 +197,7 @@ pipeline {
                         : 0
 
                     echo "Pipeline duration: ${duration}s"
-                    cleanWs()
+                    // cleanWs()
                 }
             }
         }
@@ -361,7 +361,7 @@ ${message?.trim()}
 //                         : 0
 
 //                     echo "Pipeline duration: ${duration}s"
-//                     cleanWs()
+                    cleanWs()
 //                 }
 //             }
 //         }
