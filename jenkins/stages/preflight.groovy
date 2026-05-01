@@ -10,9 +10,10 @@ def execute() {
     tools.printVersions()
 
     def state = load 'jenkins/helpers/state.groovy'
+    
 
     def meta = [
-        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
+        branch: env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'HEAD',
         commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
         author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
     ]
@@ -29,11 +30,11 @@ def execute() {
 
         'Validate Branch': {
             stage('Validate Branch') {
-                def branch = env.DETECTED_BRANCH?.trim()
+                def branch = env.GIT_BRANCH?.trim()
                 echo "Validating branch: ${branch}"
 
                 if (!branch || branch == 'HEAD' || branch == 'null') {
-                    echo "Branch not detected - skipping validation"
+                    echo "Branch not GIT - skipping validation"
                     return
                 }
 
@@ -106,8 +107,8 @@ def execute() {
                 def forceAll = (
                     env.FORCE_ALL_SERVICES == 'true' ||
                     changedFiles.isEmpty() ||
-                    env.DETECTED_BRANCH == 'main' ||
-                    env.DETECTED_BRANCH == 'develop' ||
+                    env.GIT_BRANCH == 'main' ||
+                    env.GIT_BRANCH == 'develop' ||
                     changedFiles.contains('Jenkinsfile') ||
                     changedFiles.contains('jenkins/')
                 )
@@ -118,7 +119,7 @@ def execute() {
 
                 env.CHANGED_SERVICES = changed.join(',')
 
-                echo "Branch:   ${env.DETECTED_BRANCH}"
+                echo "Branch:   ${env.GIT_BRANCH}"
                 echo "Commit:   ${env.SHORT_COMMIT}"
                 echo "Author:   ${env.GIT_AUTHOR}"
                 echo "Services: ${changed.join(', ')}"

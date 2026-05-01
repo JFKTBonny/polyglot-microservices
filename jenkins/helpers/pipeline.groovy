@@ -22,7 +22,7 @@ def checkSecretReport(String file, String tool) {
                 echo "  File: ${f.File ?: 'unknown'}"
                 echo "  Line: ${f.StartLine ?: 'unknown'}"
             }
-            block(tool, "${findings.size()} secret(s) detected")
+            block(tool, "${findings.size()} secret(s) GIT")
         } else {
             echo "${tool} passed"
         }
@@ -88,7 +88,7 @@ def changedServices() {
 }
 
 def isDeployBranch() {
-    return env.DETECTED_BRANCH == 'main' || env.DETECTED_BRANCH == 'develop'
+    return env.GIT_BRANCH == 'main' || env.GIT_BRANCH == 'develop'
 }
 
 

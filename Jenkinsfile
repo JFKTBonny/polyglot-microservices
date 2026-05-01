@@ -5,7 +5,7 @@
 //         DOCKER_CREDS    = credentials('dockerhub')
 //         PIPELINE_START  = ''
 //         FAILED_STAGE    = ''
-//         DETECTED_BRANCH = ''
+//         GIT_BRANCH = ''
 //         SHORT_COMMIT    = ''
 //         GIT_AUTHOR      = ''
 //         CHANGED_SERVICES = ''
@@ -38,7 +38,7 @@
 // ════════════════════════════════════
 //   Pipeline Init
 // ════════════════════════════════════
-// Branch : ${env.DETECTED_BRANCH}
+// Branch : ${env.GIT_BRANCH}
 // Author : ${env.GIT_AUTHOR}
 // Commit : ${env.SHORT_COMMIT}
 // ════════════════════════════════════
@@ -97,7 +97,7 @@
 //                 failure {
 //                     script {
 //                         notify(
-//                             'CRITICAL — Secrets Detected',
+//                             'CRITICAL — Secrets GIT',
 //                             "Branch: ${safeState().branch}\nRotate credentials immediately"
 //                         )
 //                     }
@@ -196,7 +196,7 @@ pipeline {
         FAILED_STAGE        = ''
 
         // ✅ persistent metadata (cross-stage safe)
-        DETECTED_BRANCH = ''
+        GIT_BRANCH = ''
         SHORT_COMMIT    = ''
         GIT_AUTHOR      = ''
     }
@@ -249,12 +249,12 @@ pipeline {
                     state.save(meta)
 
                     // ✅ ALSO save to env (CRITICAL FIX)
-                    env.DETECTED_BRANCH = meta.branch
+                    env.GIT_BRANCH = meta.branch
                     env.SHORT_COMMIT    = meta.commit
                     env.GIT_AUTHOR      = meta.author
 
                     echo "Metadata initialized:"
-                    echo "Branch: ${env.DETECTED_BRANCH}"
+                    echo "Branch: ${env.GIT_BRANCH}"
                     echo "Commit: ${env.SHORT_COMMIT}"
                     echo "Author: ${env.GIT_AUTHOR}"
                 }
@@ -309,7 +309,7 @@ pipeline {
                     script {
                         def s = safeState()
                         notify(
-                            'CRITICAL — Secrets Detected',
+                            'CRITICAL — Secrets GIT',
                             "Branch: ${s.branch}\nRotate credentials immediately"
                         )
                     }
@@ -382,13 +382,13 @@ def safeState() {
         def s = state.load()
 
         return [
-            branch: s.branch ?: env.DETECTED_BRANCH ?: 'unknown',
+            branch: s.branch ?: env.GIT_BRANCH ?: 'unknown',
             author: s.author ?: env.GIT_AUTHOR ?: 'unknown',
             commit: s.commit ?: env.SHORT_COMMIT ?: 'unknown'
         ]
     } catch (err) {
         return [
-            branch: env.DETECTED_BRANCH ?: 'unknown',
+            branch: env.GIT_BRANCH ?: 'unknown',
             author: env.GIT_AUTHOR ?: 'unknown',
             commit: env.SHORT_COMMIT ?: 'unknown'
         ]
