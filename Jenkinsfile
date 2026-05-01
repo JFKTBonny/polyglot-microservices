@@ -98,7 +98,7 @@ Author : ${env.GIT_AUTHOR}
                         def s = safeState()
                         notify(
                             'Pre-flight Failed',
-                            "Branch: ${s.branch}\nFix branch name or commit message"
+                            "Branch: ${s.branch}\\nFix branch name or commit message"
                         )
                     }
                 }
@@ -126,14 +126,12 @@ Author : ${env.GIT_AUTHOR}
                         def s = safeState()
                         notify(
                             'CRITICAL — Secrets Detected',
-                            "Branch: ${s.branch}\nRotate credentials immediately"
+                            "Branch: ${s.branch}\\nRotate credentials immediately"
                         )
                     }
                 }
             }
         }
-
-        // Stage is gone; use post/cleanWs below instead
     }
 
     // =======================
@@ -167,7 +165,7 @@ Author: ${s.author}"""
         always {
             script {
                 try {
-                    cleanWs()  // no `node('built-in')` needed here; `cleanWs()` already runs on agent
+                    cleanWs()
                 } catch (err) {
                     echo "Workspace cleanup skipped: ${err}"
                 }
