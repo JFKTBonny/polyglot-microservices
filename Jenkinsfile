@@ -22,43 +22,56 @@ pipeline {
 
     stages {
 
-       stage('Init') {
+        stage('Init') {
             steps {
                 script {
-                    def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
-                    def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
-                    def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
-                    def rawFull   = sh(returnStdout: true, script: 'git log -1 --pretty=format:%H || true').trim()
-                    def rawBranch = sh(returnStdout: true, script: '''
-                        git name-rev --name-only HEAD 2>/dev/null \
-                            | sed "s|remotes/origin/||" \
-                            | sed "s|~.*||" \
-                            || true
-                    ''').trim()
 
-                    echo "RAW branch: '${rawBranch}'"
-                    echo "RAW author: '${rawAuthor}'"
-                    echo "RAW commit: '${rawShort}'"
+                    // Ensure repo is checked out
+                    checkout scm
 
-                    // Use currentBuild.description as workaround
-                    // and store in global binding
-                    binding.variables.PIPELINE_BRANCH  = rawBranch
-                    binding.variables.PIPELINE_AUTHOR  = rawAuthor
-                    binding.variables.PIPELINE_EMAIL   = rawEmail
-                    binding.variables.PIPELINE_COMMIT  = rawShort
-                    binding.variables.PIPELINE_FULL    = rawFull
-                    binding.variables.PIPELINE_START   = System.currentTimeMillis().toString()
+                    // Single git call (fast + atomic)
+                    def gitInfo = sh(
+                        returnStdout: true,
+                        script: '''
+                            git log -1 --pretty=format:"%an|%ae|%h|%H"
+                        '''
+                    ).trim().split("\\|")
 
-                    env.PIPELINE_BRANCH  = rawBranch
-                    env.PIPELINE_AUTHOR  = rawAuthor
-                    env.PIPELINE_EMAIL   = rawEmail
-                    env.PIPELINE_COMMIT  = rawShort
-                    env.PIPELINE_FULL    = rawFull
-                    env.PIPELINE_START   = System.currentTimeMillis().toString()
+                    def author = gitInfo[0]
+                    def email  = gitInfo[1]
+                    def shortC = gitInfo[2]
+                    def fullC  = gitInfo[3]
 
-                    echo "Branch:  ${env.PIPELINE_BRANCH}"
-                    echo "Author:  ${env.PIPELINE_AUTHOR}"
-                    echo "Commit:  ${env.PIPELINE_COMMIT}"
+                    // Use Jenkins-native branch detection FIRST
+                    def branch = env.BRANCH_NAME ?: sh(
+                        returnStdout: true,
+                        script: 'git rev-parse --abbrev-ref HEAD'
+                    ).trim()
+
+                    // Fallback for detached HEAD
+                    if (branch == "HEAD") {
+                        branch = sh(
+                            returnStdout: true,
+                            script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||"'
+                        ).trim()
+                    }
+
+                    // Export globally (ONLY env, no binding)
+                    env.PIPELINE_BRANCH = branch
+                    env.PIPELINE_AUTHOR = author
+                    env.PIPELINE_EMAIL  = email
+                    env.PIPELINE_COMMIT = shortC
+                    env.PIPELINE_FULL   = fullC
+                    env.PIPELINE_START  = System.currentTimeMillis().toString()
+
+                    echo """
+                    ─── PIPELINE INIT ───
+                    Branch : ${env.PIPELINE_BRANCH}
+                    Author : ${env.PIPELINE_AUTHOR}
+                    Email  : ${env.PIPELINE_EMAIL}
+                    Commit : ${env.PIPELINE_COMMIT}
+                    ─────────────────────
+                    """
                 }
             }
         }
