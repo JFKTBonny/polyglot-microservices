@@ -27,14 +27,7 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Test simple assignment
-                    env.TEST_VAR = "hello_world"
-                    echo "TEST_VAR: ${env.TEST_VAR}"
-
-                    // Test with rawBranch value
-                    env.TEST_BRANCH = rawBranch
-                    echo "TEST_BRANCH: ${env.TEST_BRANCH}"
-
+                    
                     def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
                     def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
                     def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
@@ -45,6 +38,15 @@ pipeline {
                             | sed "s|~.*||" \
                             || true
                     ''').trim()
+
+                    // Test simple assignment
+                    env.TEST_VAR = "hello_world"
+                    echo "TEST_VAR: ${env.TEST_VAR}"
+
+                    // Test with rawBranch value
+                    env.TEST_BRANCH = rawBranch
+                    echo "TEST_BRANCH: ${env.TEST_BRANCH}"
+
 
                     echo "RAW branch: '${rawBranch}'"
                     echo "RAW author: '${rawAuthor}'"
