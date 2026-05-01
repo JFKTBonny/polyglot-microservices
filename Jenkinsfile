@@ -25,30 +25,42 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    env.DETECTED_BRANCH = env.BRANCH_NAME
-                        ?: env.GIT_BRANCH?.replaceFirst('origin/', '')
-                        ?: sh(
-                            script: "git rev-parse --abbrev-ref HEAD",
-                            returnStdout: true
-                        ).trim()
+                    // For regular Pipeline jobs — get branch from remote refs
+                    def branch = sh(
+                        script: """
+                            git name-rev --name-only HEAD 2>/dev/null \
+                                | sed 's|remotes/origin/||' \
+                                | sed 's|~.*||' \
+                                | sed 's|\\^.*||' \
+                                || echo 'unknown'
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    // Fallback to job name if git fails
+                    if (!branch || branch == 'HEAD' || branch == 'undefined') {
+                        branch = env.JOB_NAME?.tokenize('/')?.last() ?: 'unknown'
+                    }
+
+                    env.DETECTED_BRANCH = branch
 
                     env.GIT_AUTHOR = sh(
-                        script: "git log -1 --pretty=%an",
+                        script: "git log -1 --pretty=%an 2>/dev/null || echo 'unknown'",
                         returnStdout: true
                     ).trim()
 
                     env.GIT_AUTHOR_EMAIL = sh(
-                        script: "git log -1 --pretty=%ae",
+                        script: "git log -1 --pretty=%ae 2>/dev/null || echo 'unknown'",
                         returnStdout: true
                     ).trim()
 
                     env.SHORT_COMMIT = sh(
-                        script: "git log -1 --pretty=%h",
+                        script: "git log -1 --pretty=%h 2>/dev/null || echo 'unknown'",
                         returnStdout: true
                     ).trim()
 
                     env.FULL_COMMIT = sh(
-                        script: "git log -1 --pretty=%H",
+                        script: "git log -1 --pretty=%H 2>/dev/null || echo 'unknown'",
                         returnStdout: true
                     ).trim()
 
@@ -57,6 +69,7 @@ pipeline {
                     echo "Branch:  ${env.DETECTED_BRANCH}"
                     echo "Author:  ${env.GIT_AUTHOR}"
                     echo "Commit:  ${env.SHORT_COMMIT}"
+                    echo "Email:   ${env.GIT_AUTHOR_EMAIL}"
                 }
             }
         }
