@@ -25,39 +25,27 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Explicit checkout to branch (fixes detached HEAD, enables git log/branch)
-                    def branchName = params.BRANCH ?: env.BRANCH_NAME ?: 'main'  // Fallback
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "*/${branchName}"]],
-                        extensions: [
-                            [$class: 'CloneOption', shallow: true, depth: 10],  // Shallow history for log
-                            [$class: 'LocalBranch']  // Creates local branch ref
-                        ],
-                        userRemoteConfigs: [[url: env.GIT_URL ?: scm.userRemoteConfigs[0]?.url]]
-                    ])
+                    // Use withCredentials-safe approach
+                    def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
+                    def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
+                    def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
+                    def rawFull   = sh(returnStdout: true, script: 'git log -1 --pretty=format:%H || true').trim()
+                    def rawBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD 2>/dev/null | sed "s|remotes/origin/||" | sed "s|~.*||" || true').trim()
 
-                    // Now git commands work
-                    env.DETECTED_BRANCH = sh(script: "git branch --show-current || git rev-parse --abbrev-ref HEAD || echo 'unknown'", returnStdout: true).trim()
-                    env.GIT_AUTHOR = sh(script: "git log -1 --pretty='%an' || echo 'unknown'", returnStdout: true).trim()
-                    env.GIT_AUTHOR_EMAIL = sh(script: "git log -1 --pretty='%ae' || echo 'unknown'", returnStdout: true).trim()
-                    env.SHORT_COMMIT = sh(script: "git log -1 --pretty='%h' || echo 'unknown'", returnStdout: true).trim()
-                    env.FULL_COMMIT = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
+                    echo "RAW branch: '${rawBranch}'"
+                    echo "RAW author: '${rawAuthor}'"
+                    echo "RAW commit: '${rawShort}'"
 
-                    // Changed services (now reliable)
-                    def baseBranch = (env.DETECTED_BRANCH == 'main') ? 'origin/develop' : 'origin/main'
-                    sh "git fetch origin ${baseBranch} || git fetch origin main || true"
-                    def changed = sh(script: """
-                        git diff --name-only \$(git merge-base ${baseBranch} HEAD || echo HEAD~1) HEAD 2>/dev/null | grep -E '^(services/[^/]+)/' || true
-                    """, returnStdout: true).trim()
-                    env.CHANGED_SERVICES = changed ?: 'none'
-
+                    env.DETECTED_BRANCH = (rawBranch && rawBranch != 'HEAD') ? rawBranch : (env.GIT_BRANCH?.replaceFirst('origin/', '') ?: env.JOB_NAME?.tokenize('/')?.last() ?: 'unknown')
+                    env.GIT_AUTHOR      = rawAuthor ?: 'unknown'
+                    env.GIT_AUTHOR_EMAIL = rawEmail ?: 'unknown'
+                    env.SHORT_COMMIT    = rawShort ?: 'unknown'
+                    env.FULL_COMMIT     = rawFull ?: 'unknown'
                     env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
 
                     echo "Branch:  ${env.DETECTED_BRANCH}"
-                    echo "Author:  ${env.GIT_AUTHOR} <${env.GIT_AUTHOR_EMAIL}>"
+                    echo "Author:  ${env.GIT_AUTHOR}"
                     echo "Commit:  ${env.SHORT_COMMIT}"
-                    echo "Changed: ${env.CHANGED_SERVICES}"
                 }
             }
         }
