@@ -2,14 +2,24 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 
 def getFile() {
-    return "jenkins/state/pipeline-meta.json"
+    "jenkins/state/pipeline-meta.json"
 }
 
 def save(Map data) {
-    def file = getFile()
-
-    writeFile file: file,
+    writeFile file: getFile(),
         text: JsonOutput.prettyPrint(JsonOutput.toJson(data))
+}
+
+def toSafeObject(obj) {
+    if (obj instanceof Map) {
+        return obj.collectEntries { k, v ->
+            [(k): toSafeObject(v)]
+        }
+    }
+    if (obj instanceof List) {
+        return obj.collect { toSafeObject(it) }
+    }
+    return obj
 }
 
 def load() {
@@ -22,8 +32,7 @@ def load() {
     def raw = readFile(file)
     def parsed = new JsonSlurper().parseText(raw)
 
-    // IMPORTANT: force safe CPS-friendly Map
-    return parsed as Map
+    return toSafeObject(parsed ?: [:])
 }
 
 return this
