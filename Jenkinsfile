@@ -22,9 +22,7 @@ pipeline {
 
     stages {
 
-         
-
-        stage('Init') {
+       stage('Init') {
             steps {
                 script {
                     def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
@@ -131,4 +129,22 @@ pipeline {
             node('built-in') {
                 script {
                     notify(
-                        'Pipeline Failed',kljipoh
+                        'Pipeline Failed',
+                        "Branch: ${env.DETECTED_BRANCH}\nFailed Stage: ${env.FAILED_STAGE}\nAuthor: ${env.GIT_AUTHOR}"
+                    )
+                }
+            }
+        }
+    }
+
+} // end pipeline
+
+def notify(String title, String message) {
+    echo """
+════════════════════════════════════
+  ${title}
+════════════════════════════════════
+${message?.trim()}
+════════════════════════════════════
+    """
+}
