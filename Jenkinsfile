@@ -26,28 +26,13 @@ pipeline {
             steps {
                 script {
                     try {
-                        def state = load 'jenkins/helpers/state.groovy'
-                        def gitInfo = sh(
-                            returnStdout: true,
-                            script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
-                        ).trim().split("\\|")
+                        def config = [:]
 
-                        def branch = env.BRANCH_NAME ?: sh(
-                            returnStdout: true,
-                            script: 'git rev-parse --abbrev-ref HEAD'
-                        ).trim()
+                        def initStage = load 'jenkins/stages/init.groovy'
+                        initStage.call(config)
 
-                        if (branch == 'HEAD') {
-                            branch = sh(
-                                returnStdout: true,
-                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||"'
-                            ).trim()
-                        }
+                        env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
 
-                        env.DETECTED_BRANCH = branch      ?: 'unknown'
-                        env.GIT_AUTHOR      = gitInfo[0]  ?: 'unknown'
-                        env.SHORT_COMMIT    = gitInfo[2]  ?: 'unknown'
-                        env.PIPELINE_START  = System.currentTimeMillis().toString()
 
                         echo """
 ════════════════════════════════════
@@ -58,13 +43,17 @@ Author : ${env.GIT_AUTHOR}
 Commit : ${env.SHORT_COMMIT}
 ════════════════════════════════════
                         """
+
                     } catch (err) {
-                        env.FAILED_STAGE = 'Init'
+                        env.FAILED_STAGE = "Init"
                         throw err
                     }
                 }
             }
         }
+
+                        
+                    
 
         // ── PRE-FLIGHT ────────────────────────────────────────
         stage('Pre-flight') {
