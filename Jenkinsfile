@@ -174,11 +174,11 @@ pipeline {
 
                     echo "Pipeline duration: ${duration}s"
 
-                    // ✅ CLEAN LAST
+                    // ✅ NOW VALID
                     cleanWs()
                 }
             }
-        }
+        }    
     }
 }
 
