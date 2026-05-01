@@ -134,19 +134,18 @@ def execute() {
                     echo "Checking for committed .env files..."
 
                     def envFiles = sh(
-                        script: """
+                        script: '''
                             git ls-files | grep -E '^\\.env$|\\.env\\.' \
                                 | grep -v '.example' \
                                 | grep -v '.sample' \
                                 || true
-                        """,
+                        ''',
                         returnStdout: true
                     ).trim()
 
                     if (envFiles) {
                         echo "Committed .env files found:"
                         echo "${envFiles}"
-                        notify.securityAlert('Env File Check', ".env files committed: ${envFiles}")
                         pipeline.block('Env File Check', ".env files must not be committed")
                     }
 
