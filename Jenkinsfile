@@ -25,25 +25,29 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Robust branch detection: scm > env vars > git > fallback
-                    env.DETECTED_BRANCH = env.BRANCH_NAME
-                        ?: (scm != null ? scm.branches[0]?.name?.replaceFirst('origin/', '')?.replaceFirst('refs/heads/', '') : null)
-                        ?: env.GIT_BRANCH?.replaceFirst('origin/', '')
-                        ?: sh(script: "git rev-parse --abbrev-ref HEAD || echo 'unknown'", returnStdout: true).trim()
-                        ?: 'unknown'
+                    // Explicit checkout to branch (fixes detached HEAD, enables git log/branch)
+                    def branchName = params.BRANCH ?: env.BRANCH_NAME ?: 'main'  // Fallback
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${branchName}"]],
+                        extensions: [
+                            [$class: 'CloneOption', shallow: true, depth: 10],  // Shallow history for log
+                            [$class: 'LocalBranch']  // Creates local branch ref
+                        ],
+                        userRemoteConfigs: [[url: env.GIT_URL ?: scm.userRemoteConfigs[0]?.url]]
+                    ])
 
+                    // Now git commands work
+                    env.DETECTED_BRANCH = sh(script: "git branch --show-current || git rev-parse --abbrev-ref HEAD || echo 'unknown'", returnStdout: true).trim()
                     env.GIT_AUTHOR = sh(script: "git log -1 --pretty='%an' || echo 'unknown'", returnStdout: true).trim()
                     env.GIT_AUTHOR_EMAIL = sh(script: "git log -1 --pretty='%ae' || echo 'unknown'", returnStdout: true).trim()
                     env.SHORT_COMMIT = sh(script: "git log -1 --pretty='%h' || echo 'unknown'", returnStdout: true).trim()
-                    env.FULL_COMMIT = sh(script: "git rev-parse HEAD || echo 'unknown'", returnStdout: true).trim()
+                    env.FULL_COMMIT = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
 
-                    // Changed services: safe merge-base (main/develop fallback)
-                    def baseBranch = 'origin/main'
-                    if (env.DETECTED_BRANCH == 'main' || env.DETECTED_BRANCH == 'develop') {
-                        baseBranch = 'origin/develop'
-                    }
+                    // Changed services (now reliable)
+                    def baseBranch = (env.DETECTED_BRANCH == 'main') ? 'origin/develop' : 'origin/main'
+                    sh "git fetch origin ${baseBranch} || git fetch origin main || true"
                     def changed = sh(script: """
-                        git fetch origin ${baseBranch} || git fetch origin main || true
                         git diff --name-only \$(git merge-base ${baseBranch} HEAD || echo HEAD~1) HEAD 2>/dev/null | grep -E '^(services/[^/]+)/' || true
                     """, returnStdout: true).trim()
                     env.CHANGED_SERVICES = changed ?: 'none'
