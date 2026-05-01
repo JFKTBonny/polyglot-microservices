@@ -40,6 +40,18 @@ pipeline {
             }
         }
 
+        stage('Init Metadata') {
+            def state = load 'jenkins/helpers/state.groovy'
+
+            def meta = [
+                branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
+                commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
+                author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
+            ]
+
+            state.save(meta)
+        }
+
         stage('Pre-flight') {
             steps {
                 script {
