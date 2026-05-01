@@ -19,7 +19,11 @@ def load() {
         return [:]
     }
 
-    return new JsonSlurper().parseText(readFile(file))
+    def raw = readFile(file)
+    def parsed = new JsonSlurper().parseText(raw)
+
+    // IMPORTANT: force safe CPS-friendly Map
+    return parsed as Map
 }
 
 return this

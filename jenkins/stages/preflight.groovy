@@ -1,9 +1,4 @@
-def state = load 'jenkins/helpers/state.groovy'
-def s = state.load()
 
-echo "Branch:   ${s.branch}"
-echo "Commit:   ${s.commit}"
-echo "Author:   ${s.author}"
 
 def execute() {
     def tools    = load 'jenkins/helpers/tools.groovy'
@@ -12,6 +7,22 @@ def execute() {
 
     pipeline.banner('Stage 1 - Pre-flight')
     tools.printVersions()
+
+    def state = load 'jenkins/helpers/state.groovy'
+
+    def meta = [
+        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
+        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
+        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+    ]
+
+    state.save(meta)
+
+    def s = state.load()
+
+    echo "Branch: ${s.branch}"
+    echo "Commit: ${s.commit}"
+    echo "Author: ${s.author}"
 
     parallel(
 
