@@ -126,7 +126,7 @@ Commit : ${env.SHORT_COMMIT}
         }
         success {
             node('built-in') {
-                script{
+                script {
                     def s = safeState()
                     notify{
                         'Pipeline Passed',
