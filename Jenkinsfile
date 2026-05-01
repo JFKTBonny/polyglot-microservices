@@ -140,7 +140,7 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def state = load 'jenkins/helpers/state.groovy'
+                   
 
                     def meta = [
                         branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
@@ -166,7 +166,7 @@ pipeline {
         failure {
             node('built-in') {
                 script {
-                    def state = load 'jenkins/helpers/state.groovy'
+                    
 
                     def meta = [
                         branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
