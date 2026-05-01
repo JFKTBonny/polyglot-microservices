@@ -25,25 +25,27 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Debug — test each command directly
-                    sh "echo 'PWD:' && pwd"
-                    sh "echo 'GIT DIR:' && ls -la .git 2>/dev/null || echo 'no .git'"
-                    sh "echo 'GIT LOG:' && git log -1 2>/dev/null || echo 'git log failed'"
-                    sh "echo 'GIT BRANCH:' && git branch 2>/dev/null || echo 'git branch failed'"
-                    sh "echo 'ENV BRANCH_NAME:' && echo '${env.BRANCH_NAME}'"
-                    sh "echo 'ENV GIT_BRANCH:' && echo '${env.GIT_BRANCH}'"
-                    sh "echo 'ENV GIT_COMMIT:' && echo '${env.GIT_COMMIT}'"
-                    sh "echo 'ENV JOB_NAME:' && echo '${env.JOB_NAME}'"
+                    // Use withCredentials-safe approach
+                    def rawAuthor = sh(returnStdout: true, script: 'git log -1 --pretty=format:%an || true').trim()
+                    def rawEmail  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%ae || true').trim()
+                    def rawShort  = sh(returnStdout: true, script: 'git log -1 --pretty=format:%h || true').trim()
+                    def rawFull   = sh(returnStdout: true, script: 'git log -1 --pretty=format:%H || true').trim()
+                    def rawBranch = sh(returnStdout: true, script: 'git name-rev --name-only HEAD 2>/dev/null | sed "s|remotes/origin/||" | sed "s|~.*||" || true').trim()
 
-                    // Try reading directly
-                    def author = sh(
-                        script: "git log -1 --pretty=%an",
-                        returnStdout: true
-                    )
-                    echo "RAW author output: '${author}'"
-                    echo "TRIMMED: '${author?.trim()}'"
+                    echo "RAW branch: '${rawBranch}'"
+                    echo "RAW author: '${rawAuthor}'"
+                    echo "RAW commit: '${rawShort}'"
 
+                    env.DETECTED_BRANCH = (rawBranch && rawBranch != 'HEAD') ? rawBranch : (env.GIT_BRANCH?.replaceFirst('origin/', '') ?: env.JOB_NAME?.tokenize('/')?.last() ?: 'unknown')
+                    env.GIT_AUTHOR      = rawAuthor ?: 'unknown'
+                    env.GIT_AUTHOR_EMAIL = rawEmail ?: 'unknown'
+                    env.SHORT_COMMIT    = rawShort ?: 'unknown'
+                    env.FULL_COMMIT     = rawFull ?: 'unknown'
                     env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+
+                    echo "Branch:  ${env.DETECTED_BRANCH}"
+                    echo "Author:  ${env.GIT_AUTHOR}"
+                    echo "Commit:  ${env.SHORT_COMMIT}"
                 }
             }
         }

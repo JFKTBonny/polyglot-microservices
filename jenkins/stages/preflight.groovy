@@ -50,7 +50,7 @@ def execute() {
                            msg.startsWith('Revert ')
 
                 def valid = msg.matches(
-                    '^(feat|fix|docs|style|refactor|test|chore|ci|security|perf|build|revert)(\\([a-z0-9\\-]+\\))?: .{10,100}$'
+                    '^(feat|fix|docs|style|refactor|test|chore|ci|security|perf|build|revert|debug|hotfix)(\\([a-z0-9\\-]+\\))?: .{10,100}$'
                 )
 
                 if (!skip && !valid) {
@@ -62,6 +62,7 @@ def execute() {
                 echo "Commit valid: ${msg}"
             }
         },
+
 
         'Detect Changes': {
             stage('Detect Changes') {
