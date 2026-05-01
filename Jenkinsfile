@@ -135,6 +135,60 @@ pipeline {
     // =======================
     post {
 
+        
+
+        success {
+            node('built-in') {
+                script {
+                    def state = load 'jenkins/helpers/state.groovy'
+
+                    def meta = [
+                        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
+                        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
+                        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+                    ]
+
+                    state.save(meta)
+
+                    def s = state.load()
+
+                    notify(
+                        'Pipeline Passed',
+
+                    """Branch: ${s.branch}                      
+                       Author: ${s.author}
+                       Commit: ${s.commit}"""
+                    )
+                }
+            }
+        }
+
+        failure {
+            node('built-in') {
+                script {
+                    def state = load 'jenkins/helpers/state.groovy'
+
+                    def meta = [
+                        branch: env.BRANCH_NAME ?: env.DETECTED_BRANCH ?: 'HEAD',
+                        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
+                        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+                    ]
+
+                    state.save(meta)
+
+                    def s = state.load()
+
+                    notify(
+                        'Pipeline Failed',
+
+                        """Branch: ${s.branch}
+                            Failed Stage: ${env.FAILED_STAGE}
+                            Author: ${s.author}"""
+                    )
+                }
+            }
+        }
+
         always {
             node('built-in') {
                 script {
@@ -144,36 +198,6 @@ pipeline {
 
                     echo "Pipeline duration: ${duration}s"
                     cleanWs()
-                }
-            }
-        }
-
-        success {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Passed',
-                        """Branch: ${s.branch}
-Author: ${s.author}
-Commit: ${s.commit}"""
-                    )
-                }
-            }
-        }
-
-        failure {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Failed',
-                        """Branch: ${s.branch}
-Failed Stage: ${env.FAILED_STAGE}
-Author: ${s.author}"""
-                    )
                 }
             }
         }
