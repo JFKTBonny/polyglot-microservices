@@ -137,7 +137,7 @@ Commit : ${env.SHORT_COMMIT}
                 }
             }
         } 
-        failue {
+        failure {
             node('built-in') {
                 script {
                         def s = safeState()
