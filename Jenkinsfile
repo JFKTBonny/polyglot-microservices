@@ -2,17 +2,14 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_CREDS        = credentials('dockerhub')
-        PIPELINE_START_TIME = ''
-        FAILED_STAGE        = ''
-
-        // ✅ SAFE cross‑stage metadata
+        DOCKER_CREDS    = credentials('dockerhub')
+        PIPELINE_START  = ''
+        FAILED_STAGE    = ''
         DETECTED_BRANCH = ''
         SHORT_COMMIT    = ''
         GIT_AUTHOR      = ''
-
-        // ✅ FIX gitleaks not found
-        PATH = "/var/lib/jenkins/bin:${env.PATH}"
+        CHANGED_SERVICES = ''
+        PATH            = "/var/lib/jenkins/bin:${env.PATH}"
     }
 
     options {
@@ -23,63 +20,52 @@ pipeline {
     }
 
     stages {
-        // =======================
-        // INIT
-        // =======================
+
+        // ── INIT ──────────────────────────────────────────────
         stage('Init') {
             steps {
                 script {
                     try {
-                        def config = [:]
-                        def initStage = load 'jenkins/stages/init.groovy'
-                        initStage.call(config)
+                        def gitInfo = sh(
+                            returnStdout: true,
+                            script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
+                        ).trim().split("\\|")
 
-                        env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+                        def branch = env.BRANCH_NAME ?: sh(
+                            returnStdout: true,
+                            script: 'git rev-parse --abbrev-ref HEAD'
+                        ).trim()
+
+                        if (branch == 'HEAD') {
+                            branch = sh(
+                                returnStdout: true,
+                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||"'
+                            ).trim()
+                        }
+
+                        env.DETECTED_BRANCH = branch      ?: 'unknown'
+                        env.GIT_AUTHOR      = gitInfo[0]  ?: 'unknown'
+                        env.SHORT_COMMIT    = gitInfo[2]  ?: 'unknown'
+                        env.PIPELINE_START  = System.currentTimeMillis().toString()
+
+                        echo """
+════════════════════════════════════
+  Pipeline Init
+════════════════════════════════════
+Branch : ${env.DETECTED_BRANCH}
+Author : ${env.GIT_AUTHOR}
+Commit : ${env.SHORT_COMMIT}
+════════════════════════════════════
+                        """
                     } catch (err) {
-                        env.FAILED_STAGE = "Init"
+                        env.FAILED_STAGE = 'Init'
                         throw err
                     }
                 }
             }
         }
 
-        // =======================
-        // METADATA (SAFE)
-        // =======================
-        stage('Init Metadata') {
-            steps {
-                script {
-                    env.DETECTED_BRANCH = sh(
-                        script: 'git rev-parse --abbrev-ref HEAD',
-                        returnStdout: true
-                    ).trim()
-
-                    env.SHORT_COMMIT = sh(
-                        script: 'git rev-parse --short HEAD',
-                        returnStdout: true
-                    ).trim()
-
-                    env.GIT_AUTHOR = sh(
-                        script: 'git log -1 --pretty=%an',
-                        returnStdout: true
-                    ).trim()
-
-                    echo """
-════════════════════════════════════
- Metadata Initialized
-════════════════════════════════════
-Branch : ${env.DETECTED_BRANCH}
-Commit : ${env.SHORT_COMMIT}
-Author : ${env.GIT_AUTHOR}
-════════════════════════════════════
-"""
-                }
-            }
-        }
-
-        // =======================
-        // PRE-FLIGHT
-        // =======================
+        // ── PRE-FLIGHT ────────────────────────────────────────
         stage('Pre-flight') {
             steps {
                 script {
@@ -87,7 +73,7 @@ Author : ${env.GIT_AUTHOR}
                         def pf = load 'jenkins/stages/preflight.groovy'
                         pf.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = "Pre-flight"
+                        env.FAILED_STAGE = 'Pre-flight'
                         throw err
                     }
                 }
@@ -95,19 +81,16 @@ Author : ${env.GIT_AUTHOR}
             post {
                 failure {
                     script {
-                        def s = safeState()
                         notify(
                             'Pre-flight Failed',
-                            "Branch: ${s.branch}\\nFix branch name or commit message"
+                            "Branch: ${safeState().branch}\nFix branch name or commit message"
                         )
                     }
                 }
             }
         }
 
-        // =======================
-        // SECRET DETECTION
-        // =======================
+        // ── SECRET DETECTION ──────────────────────────────────
         stage('Secret Detection') {
             steps {
                 script {
@@ -115,7 +98,7 @@ Author : ${env.GIT_AUTHOR}
                         def sd = load 'jenkins/stages/secret-detection.groovy'
                         sd.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = "Secret Detection"
+                        env.FAILED_STAGE = 'Secret Detection'
                         throw err
                     }
                 }
@@ -123,66 +106,62 @@ Author : ${env.GIT_AUTHOR}
             post {
                 failure {
                     script {
-                        def s = safeState()
                         notify(
                             'CRITICAL — Secrets Detected',
-                            "Branch: ${s.branch}\\nRotate credentials immediately"
+                            "Branch: ${safeState().branch}\nRotate credentials immediately"
                         )
                     }
                 }
             }
         }
-    }
 
-    // =======================
-    // POST
-    // =======================
+    } // end stages
+
+    // ── POST ──────────────────────────────────────────────────
     post {
+        always {
+            node('built-in') {
+                script {
+                    try {
+                        def duration = env.PIPELINE_START
+                            ? ((System.currentTimeMillis() - env.PIPELINE_START.toLong()) / 1000).toInteger()
+                            : 0
+                        echo "Pipeline duration: ${duration}s"
+                        cleanWs()
+                    } catch (err) {
+                        echo "Cleanup error: ${err.message}"
+                    }
+                }
+            }
+        }
         success {
             script {
                 def s = safeState()
                 notify(
                     'Pipeline Passed',
-                    """Branch: ${s.branch}
-Author: ${s.author}
-Commit: ${s.commit}"""
+                    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}"
                 )
             }
         }
-
         failure {
             script {
                 def s = safeState()
                 notify(
                     'Pipeline Failed',
-                    """Branch: ${s.branch}
-Failed Stage: ${env.FAILED_STAGE}
-Author: ${s.author}"""
+                    "Branch: ${s.branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${s.author}"
                 )
             }
         }
-
-        always {
-            script {
-                try {
-                    cleanWs()
-                } catch (err) {
-                    echo "Workspace cleanup skipped: ${err}"
-                }
-            }
-        }
     }
-}
 
-// =======================
-// 🔧 SAFE HELPERS
-// =======================
+} // end pipeline
 
+// ── HELPERS ───────────────────────────────────────────────────
 def safeState() {
     return [
         branch: env.DETECTED_BRANCH ?: 'unknown',
-        commit: env.SHORT_COMMIT ?: 'unknown',
-        author: env.GIT_AUTHOR ?: 'unknown'
+        commit: env.SHORT_COMMIT    ?: 'unknown',
+        author: env.GIT_AUTHOR      ?: 'unknown'
     ]
 }
 
@@ -193,7 +172,7 @@ def notify(String title, String message) {
 ════════════════════════════════════
 ${message?.trim()}
 ════════════════════════════════════
-"""
+    """
 }
 
 
