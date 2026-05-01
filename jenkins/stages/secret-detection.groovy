@@ -1,5 +1,7 @@
 def execute() {
     def pipeline = load 'jenkins/helpers/pipeline.groovy'
+    def notify = load 'jenkins/helpers/notify.groovy'
+    def state = load 'jenkins/helpers/state.groovy'
 
     pipeline.banner('Stage 2 - Secret Detection')
     
