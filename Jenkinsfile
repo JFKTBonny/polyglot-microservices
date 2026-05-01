@@ -22,22 +22,7 @@ pipeline {
 
     stages {
 
-       stage('test') {
-          steps {
-             script {
-                sh '''
-                  // Test simple assignment
-                    env.TEST_VAR = "hello_world"
-                    echo "TEST_VAR: ${env.TEST_VAR}"
-
-                    // Test with rawBranch value
-                    env.TEST_BRANCH = rawBranch
-                    echo "TEST_BRANCH: ${env.TEST_BRANCH}"
-                    '''
-    
-             }
-          }
-       }   
+         
 
         stage('Init') {
             steps {
