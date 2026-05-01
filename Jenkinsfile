@@ -135,7 +135,40 @@ Author : ${env.GIT_AUTHOR}
                 }
             }
         }
+
+        stage('Cleanup') {
+            steps {
+                cleanWs()
+            }
+        }
     }
+
+    post {
+        success {
+            script {
+                def s = safeState()
+                notify(
+                    'Pipeline Passed',
+                    """Branch: ${s.branch}
+    Author: ${s.author}
+    Commit: ${s.commit}"""
+                )
+            }
+        }
+
+        failure {
+            script {
+                def s = safeState()
+                notify(
+                    'Pipeline Failed',
+                    """Branch: ${s.branch}
+    Failed Stage: ${env.FAILED_STAGE}
+    Author: ${s.author}"""
+                )
+                }
+        }
+    }
+}
 
     // =======================
     // POST
