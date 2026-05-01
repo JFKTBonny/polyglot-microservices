@@ -128,7 +128,7 @@ Commit : ${env.SHORT_COMMIT}
             node('built-in') {
                 script {
                     def s = safeState()
-                    notify{
+                    notify {
                         'Pipeline Passed',
                     }    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}"
                 }
@@ -138,7 +138,7 @@ Commit : ${env.SHORT_COMMIT}
             node('built-in') {
                 script {
                         def s = safeState()
-                        notify(
+                        notify (
                             'Pipeline Failed',
                             "Branch: ${s.branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${s.author}"
                         )
