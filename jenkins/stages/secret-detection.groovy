@@ -160,3 +160,5 @@ def execute() {
     echo "Secret Detection complete - no secrets found"
 }
 
+
+return this
