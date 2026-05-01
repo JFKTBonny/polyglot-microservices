@@ -91,7 +91,7 @@ def execute() {
                                     --include="*.py" --include="*.js" \
                                     --include="*.go" --include="*.java" \
                                     --include="*.php" --include="*.env" \
-                                    --include="*.yaml" --include="*.yml" \
+                                    // --include="*.yaml" --include="*.yml" \
                                     --exclude-dir={${excludes}} \
                                     -iE '${p.pattern}' . 2>/dev/null \
                                     | grep -v 'env\\.' \

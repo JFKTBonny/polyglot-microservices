@@ -22,7 +22,36 @@ pipeline {
 
     stages {
 
-        stage('Pre-flight') {
+        stage('Init') {
+            steps {
+                script {
+                    env.DETECTED_BRANCH = env.BRANCH_NAME
+                        ?: env.GIT_BRANCH?.replaceFirst('origin/', '')
+                        ?: sh(
+                            script: "git rev-parse --abbrev-ref HEAD",
+                            returnStdout: true
+                        ).trim()
+
+                    env.GIT_AUTHOR = sh(
+                        script: "git log -1 --pretty=%an",
+                        returnStdout: true
+                    ).trim()
+
+                    env.SHORT_COMMIT = sh(
+                        script: "git log -1 --pretty=%h",
+                        returnStdout: true
+                    ).trim()
+
+                    env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+
+                    echo "Branch:  ${env.DETECTED_BRANCH}"
+                    echo "Author:  ${env.GIT_AUTHOR}"
+                    echo "Commit:  ${env.SHORT_COMMIT}"
+                }
+            }
+        }
+
+        stage('Preflight') {
             steps {
                 script {
                     def pf = load 'jenkins/stages/preflight.groovy'
@@ -33,7 +62,7 @@ pipeline {
                 failure {
                     script {
                         notify(
-                            'Pre-flight Failed',
+                            'Preflight Failed',
                             "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nFix branch name or commit message"
                         )
                     }
