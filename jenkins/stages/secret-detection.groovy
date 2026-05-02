@@ -8,54 +8,54 @@ def execute() {
 
 // ── 2.1 GitLeaks ──────────────────────────────────────────
 stage('GitLeaks') {
-    echo "Running GitLeaks..."
+        echo "Running GitLeaks..."
 
-    writeFile file: 'install-gitleaks.sh', text: '''#!/bin/bash
-set -e
+        writeFile file: 'install-gitleaks.sh', text: '''#!/bin/bash
+INSTALL_DIR="/var/lib/jenkins/bin"
+mkdir -p $INSTALL_DIR
 
-if ! command -v gitleaks &>/dev/null; then
-    echo "Installing gitleaks..."
-
-    TMP_DIR=$(mktemp -d)
-    cd $TMP_DIR
-
-    curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
-        | tar -xz
-
-    chmod +x gitleaks
-
-    # install locally first (safe for Jenkins agents)
-    mkdir -p $HOME/bin
-    mv gitleaks $HOME/bin/gitleaks
-
-    export PATH="$HOME/bin:$PATH"
-
-    echo "Installed gitleaks to $HOME/bin/gitleaks"
+if [ -f "$INSTALL_DIR/gitleaks" ]; then
+    echo "gitleaks already installed"
+    $INSTALL_DIR/gitleaks version
+    exit 0
 fi
 
-gitleaks version
+echo "Installing gitleaks..."
+curl -sSfL \
+    https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
+    | tar -xz -C /tmp 2>/dev/null || true
+mv /tmp/gitleaks $INSTALL_DIR/gitleaks
+chmod +x $INSTALL_DIR/gitleaks
 echo "gitleaks ready"
+$INSTALL_DIR/gitleaks version
 '''
-    sh 'bash install-gitleaks.sh && rm -f install-gitleaks.sh'
+        sh 'bash install-gitleaks.sh && rm -f install-gitleaks.sh'
 
-    writeFile file: 'run-gitleaks.sh', text: '''#!/bin/bash
-set -e
+        writeFile file: 'run-gitleaks.sh', text: '''#!/bin/bash
+GITLEAKS="/var/lib/jenkins/bin/gitleaks"
 
-gitleaks detect \
+if [ ! -f "$GITLEAKS" ]; then
+    echo "ERROR: gitleaks not found at $GITLEAKS"
+    exit 1
+fi
+
+$GITLEAKS detect \
     --source . \
     --report-format json \
     --report-path gitleaks-report.json \
     --redact \
-    || true
+    --no-git \
+    --config .gitleaks.toml \
+    2>&1 || true
+
+echo "Scan complete"
 '''
-    sh 'bash run-gitleaks.sh && rm -f run-gitleaks.sh'
+        sh 'bash run-gitleaks.sh && rm -f run-gitleaks.sh'
 
-    pipeline.checkSecretReport('gitleaks-report.json', 'GitLeaks')
-    pipeline.archiveReport('gitleaks-report.json')
-
-    echo "GitLeaks passed"
+        pipeline.checkSecretReport('gitleaks-report.json', 'GitLeaks')
+        pipeline.archiveReport('gitleaks-report.json')
+        echo "GitLeaks passed"
 }
-
 
 
     // ── 2.2 TruffleHog ────────────────────────────────────────

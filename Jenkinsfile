@@ -217,29 +217,36 @@ pipeline {
             steps {
                 script {
                     try {
-                        def gitInfo = sh(
-                            returnStdout: true,
-                            script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
-                        ).trim().split("\\|")
+                        // Single quotes around format to avoid shell interpretation
+                        def author = sh(returnStdout: true,
+                            script: "git log -1 --pretty=format:'%an'").trim().replaceAll("'", "")
+                        def email  = sh(returnStdout: true,
+                            script: "git log -1 --pretty=format:'%ae'").trim().replaceAll("'", "")
+                        def shortC = sh(returnStdout: true,
+                            script: "git log -1 --pretty=format:'%h'").trim().replaceAll("'", "")
+                        def fullC  = sh(returnStdout: true,
+                            script: "git log -1 --pretty=format:'%H'").trim().replaceAll("'", "")
 
                         def branch = env.BRANCH_NAME ?: sh(
                             returnStdout: true,
                             script: 'git rev-parse --abbrev-ref HEAD'
                         ).trim()
 
-                        if (branch == 'HEAD') {
+                        if (!branch || branch == 'HEAD') {
                             branch = sh(
                                 returnStdout: true,
-                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||"'
+                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||" | tr -d " "'
                             ).trim()
                         }
 
-                        env.DETECTED_BRANCH = branch?.trim()   ?: 'unknown'
-                        env.GIT_AUTHOR      = gitInfo[0]?.trim() ?: 'unknown'
-                        env.SHORT_COMMIT    = gitInfo[2]?.trim() ?: 'unknown'
+                        env.DETECTED_BRANCH = branch  ?: 'unknown'
+                        env.GIT_AUTHOR      = author  ?: 'unknown'
+                        env.GIT_AUTHOR_EMAIL = email  ?: 'unknown'
+                        env.SHORT_COMMIT    = shortC  ?: 'unknown'
+                        env.FULL_COMMIT     = fullC   ?: 'unknown'
                         env.PIPELINE_START  = System.currentTimeMillis().toString()
 
-                        // Write state file — readable by parallel stages
+                        // Write state file for parallel stages
                         writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
 GIT_AUTHOR=${env.GIT_AUTHOR}
 SHORT_COMMIT=${env.SHORT_COMMIT}

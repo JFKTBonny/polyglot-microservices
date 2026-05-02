@@ -1,40 +1,40 @@
-
-
 def execute() {
     def tools    = load 'jenkins/helpers/tools.groovy'
     def pipeline = load 'jenkins/helpers/pipeline.groovy'
-    
-    
 
     pipeline.banner('Stage 1 - Pre-flight')
     tools.printVersions()
 
-    def state = load 'jenkins/helpers/state.groovy'
-    
+    // Read state written by Init stage
+    def state = [branch: 'unknown', author: 'unknown', commit: 'unknown']
+    try {
+        if (fileExists('.pipeline-state')) {
+            readFile('.pipeline-state').split('\n').each { line ->
+                def parts = line.split('=', 2)
+                if (parts.size() == 2) {
+                    if (parts[0] == 'DETECTED_BRANCH') state.branch = parts[1]
+                    if (parts[0] == 'GIT_AUTHOR')      state.author = parts[1]
+                    if (parts[0] == 'SHORT_COMMIT')    state.commit = parts[1]
+                }
+            }
+        }
+    } catch (e) {
+        echo "Could not read state file: ${e.message}"
+    }
 
-    def meta = [
-        branch: env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'HEAD',
-        commit: sh(script: "git rev-parse --short HEAD", returnStdout: true).trim(),
-        author: sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-    ]
-
-    state.save(meta)
-
-    def s = state.load()
-
-    echo "Branch: ${s.branch}"
-    echo "Commit: ${s.commit}"
-    echo "Author: ${s.author}"
+    echo "Branch: ${state.branch}"
+    echo "Author: ${state.author}"
+    echo "Commit: ${state.commit}"
 
     parallel(
 
         'Validate Branch': {
             stage('Validate Branch') {
-                def branch = env.GIT_BRANCH?.trim()
+                def branch = state.branch
                 echo "Validating branch: ${branch}"
 
-                if (!branch || branch == 'HEAD' || branch == 'null') {
-                    echo "Branch not GIT - skipping validation"
+                if (!branch || branch == 'HEAD' || branch == 'unknown') {
+                    echo "Branch not detected - skipping validation"
                     return
                 }
 
@@ -48,10 +48,7 @@ def execute() {
                 )
 
                 if (!valid) {
-                    pipeline.block(
-                        'Branch Validation',
-                        "Invalid branch name: ${branch}"
-                    )
+                    pipeline.block('Branch Validation', "Invalid branch: ${branch}")
                 }
                 echo "Branch valid: ${branch}"
             }
@@ -66,24 +63,21 @@ def execute() {
 
                 echo "Validating commit: ${msg}"
 
-                def skip = msg.startsWith('Merge ') ||
-                           msg.startsWith('Initial') ||
-                           msg.startsWith('Revert ')
+                def skip = msg.startsWith('Merge ')   ||
+                           msg.startsWith('Initial')  ||
+                           msg.startsWith('Revert ')  ||
+                           msg.startsWith('security:')
 
                 def valid = msg.matches(
                     '^(feat|fix|docs|style|refactor|test|chore|ci|security|perf|build|revert|debug|hotfix)(\\([a-z0-9\\-]+\\))?: .{10,100}$'
                 )
 
                 if (!skip && !valid) {
-                    pipeline.block(
-                        'Commit Validation',
-                        "Invalid commit message: ${msg}"
-                    )
+                    pipeline.block('Commit Validation', "Invalid commit message: ${msg}")
                 }
                 echo "Commit valid: ${msg}"
             }
         },
-
 
         'Detect Changes': {
             stage('Detect Changes') {
@@ -107,8 +101,8 @@ def execute() {
                 def forceAll = (
                     env.FORCE_ALL_SERVICES == 'true' ||
                     changedFiles.isEmpty() ||
-                    env.GIT_BRANCH == 'main' ||
-                    env.GIT_BRANCH == 'develop' ||
+                    state.branch == 'main' ||
+                    state.branch == 'develop' ||
                     changedFiles.contains('Jenkinsfile') ||
                     changedFiles.contains('jenkins/')
                 )
@@ -119,9 +113,9 @@ def execute() {
 
                 env.CHANGED_SERVICES = changed.join(',')
 
-                echo "Branch:   ${env.GIT_BRANCH}"
-                echo "Commit:   ${env.SHORT_COMMIT}"
-                echo "Author:   ${env.GIT_AUTHOR}"
+                echo "Branch:   ${state.branch}"
+                echo "Commit:   ${state.commit}"
+                echo "Author:   ${state.author}"
                 echo "Services: ${changed.join(', ')}"
             }
         },
