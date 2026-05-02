@@ -195,12 +195,12 @@ pipeline {
         PIPELINE_START_TIME = ''
         FAILED_STAGE        = ''
 
-        // ✅ persistent metadata (cross-stage safe)
-        GIT_BRANCH = ''
+        DETECTED_BRANCH = ''
         SHORT_COMMIT    = ''
         GIT_AUTHOR      = ''
-    }
 
+        PATH = "/var/lib/jenkins/bin:${env.PATH}"   // ✅ FIX
+    }
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 60, unit: 'MINUTES')
@@ -298,15 +298,13 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def branch  = env.BRANCH_NAME ?: 'unknown'
-                    def commit  = env.GIT_COMMIT  ?: 'unknown'
-                    def author  = env.GIT_AUTHOR_NAME ?: 'unknown'
+                    def s = safeState()
 
                     notify(
                         'Pipeline Passed',
-                        """Branch: ${branch}
-    Author: ${author}
-    Commit: ${commit}"""
+                        """Branch: ${s.branch}
+Author: ${s.author}
+Commit: ${s.commit}"""
                     )
                 }
             }
@@ -315,15 +313,13 @@ pipeline {
         failure {
             node('built-in') {
                 script {
-                    def branch      = env.BRANCH_NAME ?: 'unknown'
-                    def failedStage = env.FAILED_STAGE ?: 'unknown'
-                    def author      = env.GIT_AUTHOR_NAME ?: 'unknown'
+                    def s = safeState()
 
                     notify(
                         'Pipeline Failed',
-                        """Branch: ${branch}
-    Failed Stage: ${failedStage}
-    Author: ${author}"""
+                        """Branch: ${s.branch}
+Failed Stage: ${env.FAILED_STAGE}
+Author: ${s.author}"""
                     )
                 }
             }
@@ -337,6 +333,7 @@ pipeline {
                         : 0
 
                     echo "Pipeline duration: ${duration}s"
+
                     cleanWs()
                 }
             }
@@ -345,9 +342,7 @@ pipeline {
 }
 
 
-// =======================
-// 🔧 SAFE HELPERS (FIXED)
-// =======================
+
 
 
 // =======================

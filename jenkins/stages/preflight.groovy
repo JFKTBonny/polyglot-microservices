@@ -7,6 +7,11 @@ def execute() {
 
     // Read state written by Init stage
     def state = load 'jenkins/helpers/state.groovy'
+
+    state.branch = 'unknown'
+    state.author = 'unknown'
+    state.commit = 'unknown'
+
     try {
         if (fileExists('.pipeline-state')) {
             readFile('.pipeline-state').split('\n').each { line ->
@@ -22,15 +27,15 @@ def execute() {
         echo "Could not read state file: ${e.message}"
     }
 
-    echo "Branch: ${state.branch}"
-    echo "Author: ${state.author}"
-    echo "Commit: ${state.commit}"
+    echo "Branch: ${state.branch ?: 'unknown'}"
+    echo "Author: ${state.author ?: 'unknown'}"
+    echo "Commit: ${state.commit ?: 'unknown'}"
 
     parallel(
 
         'Validate Branch': {
             stage('Validate Branch') {
-                def branch = state.branch
+                def branch = state.branch ?: 'unknown'
                 echo "Validating branch: ${branch}"
 
                 if (!branch || branch == 'HEAD' || branch == 'unknown') {
@@ -41,10 +46,10 @@ def execute() {
                 def valid = (
                     branch == 'main' ||
                     branch == 'develop' ||
-                    branch.matches('^feature/[a-z0-9][a-z0-9\\-]{2,49}$') ||
-                    branch.matches('^fix/[a-z0-9][a-z0-9\\-]{2,49}$') ||
-                    branch.matches('^hotfix/[a-z0-9][a-z0-9\\-]{2,49}$') ||
-                    branch.matches('^release/v\\d+\\.\\d+\\.\\d+$')
+                    branch ==~ '^feature/[a-z0-9][a-z0-9\\-]{2,49}$' ||
+                    branch ==~ '^fix/[a-z0-9][a-z0-9\\-]{2,49}$' ||
+                    branch ==~ '^hotfix/[a-z0-9][a-z0-9\\-]{2,49}$' ||
+                    branch ==~ '^release/v\\d+\\.\\d+\\.\\d+$'
                 )
 
                 if (!valid) {
@@ -68,9 +73,7 @@ def execute() {
                            msg.startsWith('Revert ')  ||
                            msg.startsWith('security:')
 
-                def valid = msg.matches(
-                    '^(feat|fix|docs|style|refactor|test|chore|ci|security|perf|build|revert|debug|hotfix)(\\([a-z0-9\\-]+\\))?: .{10,100}$'
-                )
+                def valid = msg ==~ '^(feat|fix|docs|style|refactor|test|chore|ci|security|perf|build|revert|debug|hotfix)(\\([a-z0-9\\-]+\\))?: .{10,100}$'
 
                 if (!skip && !valid) {
                     pipeline.block('Commit Validation', "Invalid commit message: ${msg}")
@@ -101,8 +104,8 @@ def execute() {
                 def forceAll = (
                     env.FORCE_ALL_SERVICES == 'true' ||
                     changedFiles.isEmpty() ||
-                    state.branch == 'main' ||
-                    state.branch == 'develop' ||
+                    (state.branch == 'main') ||
+                    (state.branch == 'develop') ||
                     changedFiles.contains('Jenkinsfile') ||
                     changedFiles.contains('jenkins/')
                 )
@@ -113,9 +116,9 @@ def execute() {
 
                 env.CHANGED_SERVICES = changed.join(',')
 
-                echo "Branch:   ${state.branch}"
-                echo "Commit:   ${state.commit}"
-                echo "Author:   ${state.author}"
+                echo "Branch:   ${state.branch ?: 'unknown'}"
+                echo "Commit:   ${state.commit ?: 'unknown'}"
+                echo "Author:   ${state.author ?: 'unknown'}"
                 echo "Services: ${changed.join(', ')}"
             }
         },
