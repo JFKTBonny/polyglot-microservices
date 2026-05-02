@@ -217,9 +217,11 @@ pipeline {
             steps {
                 script {
                     def config = [:]
-                    load 'jenkins/stages/init.groovy'.call(config)
 
-                    // 👇 persist across nodes
+                    def initStage = load 'jenkins/stages/init.groovy'
+                    initStage(config)
+
+                    // persist across nodes
                     stash name: 'pipeline-state', includes: 'jenkins/state/*'
                 }
             }
