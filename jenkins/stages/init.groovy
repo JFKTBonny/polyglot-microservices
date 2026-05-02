@@ -9,11 +9,11 @@ def call(config) {
 
     def branch = env.BRANCH_NAME ?: sh(
         returnStdout: true,
-        BRANCH_NAME = $(git rev-parse --abbrev-ref HEAD)
+        branch = $(git rev-parse --abbrev-ref HEAD)
         script: 'git rev-parse --abbrev-ref HEAD'
     ).trim()
 
-    config.branch = BRANCH_NAME
+    config.branch = branch
     config.author = gitInfo[0]
     config.email  = gitInfo[1]
     config.commit = gitInfo[2]
