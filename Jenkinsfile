@@ -352,11 +352,7 @@ pipeline {
 
 def safeState() {
     def loaded = state.load() ?: [:]
-    def defaults = [branch: 'unknown', author: 'unknown', commit: 'unknown']
-
-    return [defaults, loaded].inject([:]) { result, m ->
-        result << m   // shallow merge; `loaded` values override `defaults`
-    }
+   
 } 
 
 def notify(String title, String message) {
