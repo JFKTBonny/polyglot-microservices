@@ -308,7 +308,13 @@ pipeline {
         }
 
         always {
-            cleanWs()   // ✅ LAST
+            script {
+                def notify = load 'jenkins/helpers/notify.groovy'
+                notify.pipelineSucceeded()
+            }
+        }
+        cleanup {
+            cleanWs()
         }
     }
 }
