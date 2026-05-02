@@ -216,64 +216,11 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    try {
-                        // Write git info script to avoid pipe interpretation
-                        writeFile file: 'get-git-info.sh', text: '''#!/bin/bash
-echo "AUTHOR=$(git log -1 --pretty=format:%an)"
-echo "EMAIL=$(git log -1 --pretty=format:%ae)"
-echo "SHORT=$(git log -1 --pretty=format:%h)"
-echo "FULL=$(git log -1 --pretty=format:%H)"
-'''
-                        def gitOut = sh(
-                            returnStdout: true,
-                            script: 'bash get-git-info.sh'
-                        ).trim()
+                    def config = [:]
+                    load 'jenkins/stages/init.groovy'.call(config)
 
-                        sh 'rm -f get-git-info.sh'
-
-                        def gitMap = [:]
-                        gitOut.split('\n').each { line ->
-                            def parts = line.split('=', 2)
-                            if (parts.size() == 2) gitMap[parts[0]] = parts[1]
-                        }
-
-                        def branch = env.BRANCH_NAME ?: sh(
-                            returnStdout: true,
-                            script: 'git rev-parse --abbrev-ref HEAD'
-                        ).trim()
-
-                        if (!branch || branch == 'HEAD') {
-                            branch = sh(
-                                returnStdout: true,
-                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||" | tr -d " "'
-                            ).trim()
-                        }
-
-                        env.DETECTED_BRANCH  = branch                ?: 'unknown'
-                        env.GIT_AUTHOR       = gitMap['AUTHOR']      ?: 'unknown'
-                        env.GIT_AUTHOR_EMAIL = gitMap['EMAIL']       ?: 'unknown'
-                        env.SHORT_COMMIT     = gitMap['SHORT']       ?: 'unknown'
-                        env.FULL_COMMIT      = gitMap['FULL']        ?: 'unknown'
-                        env.PIPELINE_START   = System.currentTimeMillis().toString()
-
-                        writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
-GIT_AUTHOR=${env.GIT_AUTHOR}
-SHORT_COMMIT=${env.SHORT_COMMIT}
-PIPELINE_START=${env.PIPELINE_START}"""
-
-                        stash name: 'pipeline-state', includes: '.pipeline-state'
-
-                        echo """
-─── PIPELINE INIT ───────────────────
-Branch : ${env.DETECTED_BRANCH}
-Author : ${env.GIT_AUTHOR}
-Commit : ${env.SHORT_COMMIT}
-─────────────────────────────────────
-                        """
-                    } catch (err) {
-                        env.FAILED_STAGE = 'Init'
-                        throw err
-                    }
+                    // 👇 persist across nodes
+                    stash name: 'pipeline-state', includes: 'jenkins/state/*'
                 }
             }
         }
