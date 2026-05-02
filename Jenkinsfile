@@ -261,6 +261,27 @@ GIT_AUTHOR=${env.GIT_AUTHOR}
 SHORT_COMMIT=${env.SHORT_COMMIT}
 PIPELINE_START=${env.PIPELINE_START}"""
 
+                        def gitOut = sh(
+                            returnStdout: true,
+                            script: 'bash get-git-info.sh'
+                        ).trim()
+
+                        sh 'rm -f get-git-info.sh'
+
+                        // Debug
+                        echo "gitOut: '${gitOut}'"
+                        echo "gitOut lines: ${gitOut.split('\n').size()}"
+
+                        def gitMap = [:]
+                        gitOut.split('\n').each { line ->
+                            echo "line: '${line}'"
+                            def parts = line.split('=', 2)
+                            echo "parts: ${parts.size()}"
+                            if (parts.size() == 2) gitMap[parts[0]] = parts[1]
+                        }
+
+                        echo "gitMap: ${gitMap}"
+
                         stash name: 'pipeline-state', includes: '.pipeline-state'
 
                         echo """
