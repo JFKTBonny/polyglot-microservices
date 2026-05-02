@@ -253,11 +253,11 @@ pipeline {
                     echo "Commit: ${env.SHORT_COMMIT}"
                     echo "Author: ${env.GIT_AUTHOR}"
 
-                    def meta = [
-                        branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
-                        commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
-                        author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
-                    ]
+                    // def meta = [
+                    //     branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
+                    //     commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
+                    //     author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
+                    // ]
 
                     
                 }
