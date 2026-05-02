@@ -299,12 +299,13 @@ pipeline {
             node('built-in') {
                 script {
                     def s = safeState()
+                    def branch = s.branch ?: 'unknown'
 
                     notify(
                         'Pipeline Passed',
-                        """Branch: ${s.branch}
-Author: ${s.author}
-Commit: ${s.commit}"""
+                        """Branch: ${branch}
+    Author: ${s.author ?: 'unknown'}
+    Commit: ${s.commit ?: 'unknown'}"""
                     )
                 }
             }
@@ -314,12 +315,14 @@ Commit: ${s.commit}"""
             node('built-in') {
                 script {
                     def s = safeState()
+                    def branch = s.branch ?: 'unknown'
+                    def failedStage = env.FAILED_STAGE ?: 'unknown'
 
                     notify(
                         'Pipeline Failed',
-                        """Branch: ${s.branch}
-Failed Stage: ${env.FAILED_STAGE}
-Author: ${s.author}"""
+                        """Branch: ${branch}
+    Failed Stage: ${failedStage}
+    Author: ${s.author ?: 'unknown'}"""
                     )
                 }
             }
@@ -333,7 +336,6 @@ Author: ${s.author}"""
                         : 0
 
                     echo "Pipeline duration: ${duration}s"
-
                     cleanWs()
                 }
             }
@@ -349,10 +351,13 @@ Author: ${s.author}"""
 
 
 def safeState() {
-        
-        return state.load() ?: [branch: 'unknown', author: 'unknown', commit: 'unknown']
-}
-    
+    def loaded = state.load() ?: [:]
+    def defaults = [branch: 'unknown', author: 'unknown', commit: 'unknown']
+
+    return [defaults, loaded].inject([:]) { result, m ->
+        result << m   // shallow merge; `loaded` values override `defaults`
+    }
+} 
 
 def notify(String title, String message) {
     
