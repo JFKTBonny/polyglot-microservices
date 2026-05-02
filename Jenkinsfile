@@ -346,14 +346,13 @@ pipeline {
 
 
 def safeState() {
-    return [
-        branch: env.DETECTED_BRANCH ?: 'unknown',
-        commit: env.SHORT_COMMIT ?: 'unknown',
-        author: env.GIT_AUTHOR ?: 'unknown'
-    ]
+        
+        return state.load() ?: [branch: 'unknown', author: 'unknown', commit: 'unknown']
 }
+    
 
 def notify(String title, String message) {
+    
     echo """
 ════════════════════════════════════
   ${title}
