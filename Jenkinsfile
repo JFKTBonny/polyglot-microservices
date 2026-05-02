@@ -296,60 +296,76 @@ pipeline {
     // =======================
     post {
         always {
-            script {
-                try {
-                    cleanWs()
-                } catch (err) {
-                    echo "Cleanup: ${err.message}"
+            node('built-in') {
+                script {
+                    try {
+                        cleanWs()
+                    } catch (err) {
+                        echo "Cleanup: ${err.message}"
+                    }
                 }
             }
         }
+
         success {
-            script {
-                def branch = 'unknown'
-                def author = 'unknown'
-                def commit = 'unknown'
-                try {
-                    if (fileExists('.pipeline-state')) {
-                        def lines = readFile('.pipeline-state').split('\n')
-                        for (int i = 0; i < lines.size(); i++) {
-                            def idx = lines[i].indexOf('=')
-                            if (idx > 0) {
-                                def k = lines[i].substring(0, idx)
-                                def v = lines[i].substring(idx + 1)
-                                if (k == 'DETECTED_BRANCH') branch = v
-                                if (k == 'GIT_AUTHOR')      author = v
-                                if (k == 'SHORT_COMMIT')    commit = v
+            node('built-in') {
+                script {
+                    def branch = 'unknown'
+                    def author = 'unknown'
+                    def commit = 'unknown'
+                    try {
+                        unstash 'pipeline-state'
+                        if (fileExists('.pipeline-state')) {
+                            def lines = readFile('.pipeline-state').split('\n')
+                            for (int i = 0; i < lines.size(); i++) {
+                                def idx = lines[i].indexOf('=')
+                                if (idx > 0) {
+                                    def k = lines[i].substring(0, idx)
+                                    def v = lines[i].substring(idx + 1)
+                                    if (k == 'DETECTED_BRANCH') branch = v
+                                    if (k == 'GIT_AUTHOR')      author = v
+                                    if (k == 'SHORT_COMMIT')    commit = v
+                                }
                             }
                         }
+                    } catch (e) {
+                        echo "Could not read state: ${e.message}"
                     }
-                } catch (e) {
-                    echo "Could not read state: ${e.message}"
+                    notify(
+                        'Pipeline Passed',
+                        "Branch: ${branch}\nAuthor: ${author}\nCommit: ${commit}"
+                    )
                 }
-                notify('Pipeline Passed', "Branch: ${branch}\nAuthor: ${author}\nCommit: ${commit}")
             }
         }
+
         failure {
-            script {
-                def branch = 'unknown'
-                def author = 'unknown'
-                try {
-                    if (fileExists('.pipeline-state')) {
-                        def lines = readFile('.pipeline-state').split('\n')
-                        for (int i = 0; i < lines.size(); i++) {
-                            def idx = lines[i].indexOf('=')
-                            if (idx > 0) {
-                                def k = lines[i].substring(0, idx)
-                                def v = lines[i].substring(idx + 1)
-                                if (k == 'DETECTED_BRANCH') branch = v
-                                if (k == 'GIT_AUTHOR')      author = v
+            node('built-in') {
+                script {
+                    def branch = 'unknown'
+                    def author = 'unknown'
+                    try {
+                        unstash 'pipeline-state'
+                        if (fileExists('.pipeline-state')) {
+                            def lines = readFile('.pipeline-state').split('\n')
+                            for (int i = 0; i < lines.size(); i++) {
+                                def idx = lines[i].indexOf('=')
+                                if (idx > 0) {
+                                    def k = lines[i].substring(0, idx)
+                                    def v = lines[i].substring(idx + 1)
+                                    if (k == 'DETECTED_BRANCH') branch = v
+                                    if (k == 'GIT_AUTHOR')      author = v
+                                }
                             }
                         }
+                    } catch (e) {
+                        echo "Could not read state: ${e.message}"
                     }
-                } catch (e) {
-                    echo "Could not read state: ${e.message}"
+                    notify(
+                        'Pipeline Failed',
+                        "Branch: ${branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${author}"
+                    )
                 }
-                notify('Pipeline Failed', "Branch: ${branch}\nFailed Stage: ${env.FAILED_STAGE ?: 'unknown'}\nAuthor: ${author}")
             }
         }
     }
