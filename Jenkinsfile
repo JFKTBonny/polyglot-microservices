@@ -282,34 +282,34 @@ pipeline {
                 }
             }
         }
-
+    }
     // =======================
     // POST
     // =======================
     post {
-    success {
-        node('built-in') {
-            script {
-                load('jenkins/helpers/notify.groovy').pipelineSucceeded()
+        success {
+            node('built-in') {
+                script {
+                    load('jenkins/helpers/notify.groovy').pipelineSucceeded()
+                }
+            }
+        }
+        failure {
+            node('built-in') {
+                script {
+                    load('jenkins/helpers/notify.groovy').pipelineFailed()
+                }
+            }
+        }
+        always {
+            node('built-in') {
+                script {
+                    echo 'Pipeline Finished'
+                    cleanWs()
+                }
             }
         }
     }
-    failure {
-        node('built-in') {
-            script {
-                load('jenkins/helpers/notify.groovy').pipelineFailed()
-            }
-        }
-    }
-    always {
-        node('built-in') {
-            script {
-                echo 'Pipeline Finished'
-                cleanWs()
-            }
-        }
-    }
-}
 }
 
 
