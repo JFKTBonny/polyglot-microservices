@@ -230,9 +230,6 @@ echo "FULL=$(git log -1 --pretty=format:%H)"
                         ).trim()
 
                         sh 'rm -f get-git-info.sh'
-                        // Debug
-                        echo "gitOut: '${gitOut}'"
-                        echo "gitOut lines: ${gitOut.split('\n').size()}"
 
                         def gitMap = [:]
                         gitOut.split('\n').each { line ->
@@ -264,7 +261,6 @@ GIT_AUTHOR=${env.GIT_AUTHOR}
 SHORT_COMMIT=${env.SHORT_COMMIT}
 PIPELINE_START=${env.PIPELINE_START}"""
 
-                       
                         stash name: 'pipeline-state', includes: '.pipeline-state'
 
                         echo """
