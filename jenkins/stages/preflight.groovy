@@ -6,7 +6,7 @@ def execute() {
     tools.printVersions()
 
     // Read state written by Init stage
-    def state = [branch: 'unknown', author: 'unknown', commit: 'unknown']
+    def state = load 'jenkins/helpers/state.groovy'
     try {
         if (fileExists('.pipeline-state')) {
             readFile('.pipeline-state').split('\n').each { line ->
