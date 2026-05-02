@@ -329,8 +329,11 @@ pipeline {
         always {
             node('built-in') {
                 script {
-                    def notify = load 'jenkins/helpers/notify.groovy'
-                    notify.pipelineSucceeded()
+                    def s = safeState()
+                    notify{
+                        'Pipeline Finished',
+                        
+                    }
                }
             }
         }
