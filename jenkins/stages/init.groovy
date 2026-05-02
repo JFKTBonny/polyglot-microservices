@@ -2,36 +2,47 @@ def call(config) {
 
     def state = load 'jenkins/helpers/state.groovy'
 
+    // ✅ Get git info safely
     def gitInfo = sh(
         returnStdout: true,
         script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
     ).trim().split("\\|")
 
-    def branch = env.BRANCH_NAME ?: sh(
-        returnStdout: true,
-        branch = $(git rev-parse --abbrev-ref HEAD)
-        script: 'git rev-parse --abbrev-ref HEAD'
-    ).trim()
+    // ✅ FIXED branch detection
+    def branch = env.BRANCH_NAME
+    if (!branch) {
+        branch = sh(
+            returnStdout: true,
+            script: 'git rev-parse --abbrev-ref HEAD'
+        ).trim()
+    }
 
-    config.branch = branch
-    config.author = gitInfo[0]
-    config.email  = gitInfo[1]
-    config.commit = gitInfo[2]
-    config.full   = gitInfo[3]
-    config.start  = System.currentTimeMillis()
+    // ✅ Build CLEAN serializable map
+    def meta = [
+        branch: branch,
+        author: gitInfo[0],
+        email : gitInfo[1],
+        commit: gitInfo[2],
+        full  : gitInfo[3],
+        start : System.currentTimeMillis()
+    ]
 
-    // ✅ ensure directory exists
+    // ✅ Ensure directory exists
     sh 'mkdir -p jenkins/state'
 
-    // ✅ save state
-    state.save(config)
+    // ✅ Save ONLY clean map (not config reference)
+    state.save(meta)
+
+    // ✅ (optional) also populate config safely
+    config.putAll(meta)
 
     echo """
     ─── PIPELINE INIT ───
-    Branch : ${config.branch}
-    Author : ${config.author}
-    Commit : ${config.commit}
+    Branch : ${meta.branch}
+    Author : ${meta.author}
+    Commit : ${meta.commit}
     ─────────────────────
     """
 }
+
 return this
