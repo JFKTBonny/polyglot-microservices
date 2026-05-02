@@ -298,14 +298,15 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def s = safeState()
-                    def branch = (s?.branch ?: (env.BRANCH_NAME ?: 'unknown')).toString()
+                    def branch  = env.BRANCH_NAME ?: 'unknown'
+                    def commit  = env.GIT_COMMIT  ?: 'unknown'
+                    def author  = env.GIT_AUTHOR_NAME ?: 'unknown'
 
                     notify(
                         'Pipeline Passed',
                         """Branch: ${branch}
-    Author: ${s?.author ?: 'unknown'}
-    Commit: ${s?.commit ?: 'unknown'}"""
+    Author: ${author}
+    Commit: ${commit}"""
                     )
                 }
             }
@@ -314,15 +315,15 @@ pipeline {
         failure {
             node('built-in') {
                 script {
-                    def s = safeState()
-                    def branch = (s?.branch ?: (env.BRANCH_NAME ?: 'unknown')).toString()
-                    def failedStage = (env.FAILED_STAGE ?: 'unknown').toString()
+                    def branch      = env.BRANCH_NAME ?: 'unknown'
+                    def failedStage = env.FAILED_STAGE ?: 'unknown'
+                    def author      = env.GIT_AUTHOR_NAME ?: 'unknown'
 
                     notify(
                         'Pipeline Failed',
                         """Branch: ${branch}
     Failed Stage: ${failedStage}
-    Author: ${s?.author ?: 'unknown'}"""
+    Author: ${author}"""
                     )
                 }
             }
@@ -341,7 +342,6 @@ pipeline {
             }
         }
     }
-
 }
 
 
@@ -350,14 +350,14 @@ pipeline {
 // =======================
 
 
-def safeState() {
-    def loaded = state.load() ?: [:]
-    def defaults = [branch: 'unknown', author: 'unknown', commit: 'unknown']
+// def safeState() {
+//     def loaded = state.load() ?: [:]
+//     def defaults = [branch: 'unknown', author: 'unknown', commit: 'unknown']
 
-    return [defaults, loaded].inject([:]) { result, m ->
-        result << m   // shallow merge; `loaded` values override `defaults`
-    }
-} 
+//     return [defaults, loaded].inject([:]) { result, m ->
+//         result << m   // shallow merge; `loaded` values override `defaults`
+//     }
+// } 
 
 def notify(String title, String message) {
     
