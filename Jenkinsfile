@@ -356,7 +356,7 @@ pipeline {
 
 def safeState() {
     try {
-        def state = load 'jenkins/helpers/notify.groovy'
+        def state = load 'jenkins/helpers/state.groovy'
         return state.load()
     } catch (err) {
         return [branch: 'unknown', author: 'unknown', commit: 'unknown']

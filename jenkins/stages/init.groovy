@@ -12,7 +12,7 @@ def call(config) {
         script: 'git rev-parse --abbrev-ref HEAD'
     ).trim()
 
-    config.branch = branch
+    config.branch = $(git rev-parse --abbrev-ref HEAD)
     config.author = gitInfo[0]
     config.email  = gitInfo[1]
     config.commit = gitInfo[2]
