@@ -8,25 +8,21 @@ def call(config) {
     ).trim().split("\\|")
 
     // ✅ robust branch detection
-    def branch = env.GIT_BRANCH
+    
 
-    if (!branch) {
+    def branch = env.BRANCH_NAME ?: sh(
+    returnStdout: true,
+    script: 'git rev-parse --abbrev-ref HEAD'
+    
+    ).trim()
+
+    if (!branch || branch == 'HEAD') {
         branch = sh(
             returnStdout: true,
-            script: 'git branch --show-current'
+            script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||" | tr -d " "'
         ).trim()
     }
 
-    if (!branch) {
-        branch = sh(
-            returnStdout: true,
-            script: 'git rev-parse --abbrev-ref HEAD'
-        ).trim()
-    }
-
-    if (branch == 'HEAD' || !branch) {
-        branch = env.GIT_BRANCH ?: 'unknown'
-    }
 
     config.branch = branch
     config.author = gitInfo[0]
