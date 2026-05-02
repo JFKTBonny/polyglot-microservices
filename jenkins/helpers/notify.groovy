@@ -6,10 +6,14 @@ def send(String title, String message) {
     echo "════════════════════════════════════"
 }
 
-// def getState() {
-//     def state = load 'jenkins/helpers/state.groovy'
-//     return state.load()
-// }
+def getState() {
+    def file = 'jenkins/state/pipeline-meta.json'
+
+    if (fileExists(file)) {
+        return readJSON(file: file)
+    } 
+        return [:]
+}
 
 def pipelineSucceeded() {
     def s = getState()
