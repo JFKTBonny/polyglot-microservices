@@ -67,6 +67,8 @@ def call(config) {
 //     env.DETECTED_BRANCH = config.branch
 //     env.GIT_AUTHOR      = config.author
 //     env.SHORT_COMMIT    = config.commit
-// }
+// 
+
+}
 
 return this
