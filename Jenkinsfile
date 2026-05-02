@@ -288,30 +288,30 @@ pipeline {
                 }
             }
         }
-    }
-
-    stage('Dependency Audit') {
-            steps {
-                script {
-                    try {
-                        def da = load 'jenkins/stages/dependency-audit.groovy'
-                        da.execute()
-                    } catch (err) {
-                        env.FAILED_STAGE = 'Dependency Audit'
-                        throw err
-                    }
-                }
-            }
-            post {
-                failure {
-                    script {
-                        notify('Dependency Audit Failed',
-                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nCritical vulnerabilities found")
-                    }
-                }
-            }
-        }
     
+
+        stage('Dependency Audit') {
+                steps {
+                    script {
+                        try {
+                            def da = load 'jenkins/stages/dependency-audit.groovy'
+                            da.execute()
+                        } catch (err) {
+                            env.FAILED_STAGE = 'Dependency Audit'
+                            throw err
+                        }
+                    }
+                }
+                post {
+                    failure {
+                        script {
+                            notify('Dependency Audit Failed',
+                                "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nCritical vulnerabilities found")
+                        }
+                    }
+                }
+        }
+    }
     // =======================
     // POST
     // =======================
