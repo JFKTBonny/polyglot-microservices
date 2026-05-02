@@ -217,15 +217,24 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Single quotes around format to avoid shell interpretation
-                        def author = sh(returnStdout: true,
-                            script: 'git log -1 --pretty=format:"%an"').trim().replaceAll("'", "")
-                        def email  = sh(returnStdout: true,
-                            script: "git log -1 --pretty=format:'%ae'").trim().replaceAll("'", "")
-                        def shortC = sh(returnStdout: true,
-                            script: "git log -1 --pretty=format:'%h'").trim().replaceAll("'", "")
-                        def fullC  = sh(returnStdout: true,
-                            script: "git log -1 --pretty=format:'%H'").trim().replaceAll("'", "")
+                        // One atomic git call — pipe separated
+                        def raw = sh(
+                            returnStdout: true,
+                            script: "git log -1 --format='%an|%ae|%h|%H'"
+                        ).trim()
+
+                        echo "RAW git output: ${raw}"
+
+                        // Clean quotes and split
+                        raw = raw.replaceAll("'", "").replaceAll('"', '')
+                        def parts = raw.tokenize('|')
+
+                        echo "Parts count: ${parts.size()}"
+
+                        def author = parts.size() > 0 ? parts[0] : 'unknown'
+                        def email  = parts.size() > 1 ? parts[1] : 'unknown'
+                        def shortC = parts.size() > 2 ? parts[2] : 'unknown'
+                        def fullC  = parts.size() > 3 ? parts[3] : 'unknown'
 
                         def branch = env.BRANCH_NAME ?: sh(
                             returnStdout: true,
@@ -239,14 +248,13 @@ pipeline {
                             ).trim()
                         }
 
-                        env.DETECTED_BRANCH = branch  ?: 'unknown'
-                        env.GIT_AUTHOR      = author  ?: 'unknown'
-                        env.GIT_AUTHOR_EMAIL = email  ?: 'unknown'
-                        env.SHORT_COMMIT    = shortC  ?: 'unknown'
-                        env.FULL_COMMIT     = fullC   ?: 'unknown'
-                        env.PIPELINE_START  = System.currentTimeMillis().toString()
+                        env.DETECTED_BRANCH  = branch  ?: 'unknown'
+                        env.GIT_AUTHOR       = author  ?: 'unknown'
+                        env.GIT_AUTHOR_EMAIL = email   ?: 'unknown'
+                        env.SHORT_COMMIT     = shortC  ?: 'unknown'
+                        env.FULL_COMMIT      = fullC   ?: 'unknown'
+                        env.PIPELINE_START   = System.currentTimeMillis().toString()
 
-                        // Write state file for parallel stages
                         writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
 GIT_AUTHOR=${env.GIT_AUTHOR}
 SHORT_COMMIT=${env.SHORT_COMMIT}
