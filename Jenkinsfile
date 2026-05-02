@@ -350,30 +350,20 @@ pipeline {
 
 
 def safeState() {
-    def state = load 'jenkins/helpers/state.groovy'
-    def notify = load 'jenkins/helpers/notify.groovy'
+    def state = [:]
 
-        branch: env.DETECTED_BRANCH ?: 'unknown',
-        commit: env.SHORT_COMMIT    ?: 'unknown',
-        author: env.GIT_AUTHOR      ?: 'unknown'
-    
+    try {
+        def s = load 'jenkins/helpers/state.groovy'
+        state = s.load() ?: [:]
+    } catch (e) {
+        echo "state file not available: ${e.message}"
+    }
 
-    // try {
-    //     unstash 'pipeline-state'
-    //     if (fileExists('.pipeline-state')) {
-    //         readFile('.pipeline-state').split('\n').each { line ->
-    //             def parts = line.split('=', 2)
-    //             if (parts.size() == 2) {
-    //                 if (parts[0] == 'DETECTED_BRANCH') state.branch = parts[1]
-    //                 if (parts[0] == 'GIT_AUTHOR')      state.author = parts[1]
-    //                 if (parts[0] == 'SHORT_COMMIT')    state.commit = parts[1]
-    //             }
-    //         }
-    //     }
-    // } catch (e) {
-    //     echo "safeState: using env vars — ${e.message}"
-    // }
-    return state
+    return [
+        branch: state.branch ?: env.DETECTED_BRANCH ?: 'unknown',
+        commit: state.commit ?: env.SHORT_COMMIT ?: 'unknown',
+        author: state.author ?: env.GIT_AUTHOR ?: 'unknown'
+    ]
 }
 
 def notify(String title, String message) {
