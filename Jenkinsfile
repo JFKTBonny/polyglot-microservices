@@ -217,17 +217,25 @@ pipeline {
             steps {
                 script {
                     try {
-                        def raw = sh(
+                        // Write git info script to avoid pipe interpretation
+                        writeFile file: 'get-git-info.sh', text: '''#!/bin/bash
+echo "AUTHOR=$(git log -1 --pretty=format:%an)"
+echo "EMAIL=$(git log -1 --pretty=format:%ae)"
+echo "SHORT=$(git log -1 --pretty=format:%h)"
+echo "FULL=$(git log -1 --pretty=format:%H)"
+'''
+                        def gitOut = sh(
                             returnStdout: true,
-                            script: "git log -1 --format=%an|%ae|%h|%H"
+                            script: 'bash get-git-info.sh'
                         ).trim()
 
-                        def parts = raw.tokenize('|')
+                        sh 'rm -f get-git-info.sh'
 
-                        def author = parts.size() > 0 ? parts[0] : 'unknown'
-                        def email  = parts.size() > 1 ? parts[1] : 'unknown'
-                        def shortC = parts.size() > 2 ? parts[2] : 'unknown'
-                        def fullC  = parts.size() > 3 ? parts[3] : 'unknown'
+                        def gitMap = [:]
+                        gitOut.split('\n').each { line ->
+                            def parts = line.split('=', 2)
+                            if (parts.size() == 2) gitMap[parts[0]] = parts[1]
+                        }
 
                         def branch = env.BRANCH_NAME ?: sh(
                             returnStdout: true,
@@ -241,20 +249,18 @@ pipeline {
                             ).trim()
                         }
 
-                        env.DETECTED_BRANCH  = branch  ?: 'unknown'
-                        env.GIT_AUTHOR       = author  ?: 'unknown'
-                        env.GIT_AUTHOR_EMAIL = email   ?: 'unknown'
-                        env.SHORT_COMMIT     = shortC  ?: 'unknown'
-                        env.FULL_COMMIT      = fullC   ?: 'unknown'
+                        env.DETECTED_BRANCH  = branch                ?: 'unknown'
+                        env.GIT_AUTHOR       = gitMap['AUTHOR']      ?: 'unknown'
+                        env.GIT_AUTHOR_EMAIL = gitMap['EMAIL']       ?: 'unknown'
+                        env.SHORT_COMMIT     = gitMap['SHORT']       ?: 'unknown'
+                        env.FULL_COMMIT      = gitMap['FULL']        ?: 'unknown'
                         env.PIPELINE_START   = System.currentTimeMillis().toString()
 
-                        // Write state file for parallel stages
                         writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
 GIT_AUTHOR=${env.GIT_AUTHOR}
 SHORT_COMMIT=${env.SHORT_COMMIT}
 PIPELINE_START=${env.PIPELINE_START}"""
 
-                        // Stash state file so post{} can read it
                         stash name: 'pipeline-state', includes: '.pipeline-state'
 
                         echo """
