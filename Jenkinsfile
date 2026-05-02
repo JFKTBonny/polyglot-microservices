@@ -308,13 +308,8 @@ pipeline {
         }
 
         always {
-            echo 'Pipeline Finished'
-            cleanWs()
+            cleanWs()   // ✅ LAST
         }
-   
-        cleanup {
-            cleanWs()
-        }  
     }
 }
 
