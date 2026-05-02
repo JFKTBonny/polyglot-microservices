@@ -238,13 +238,8 @@ pipeline {
         stage('Init Metadata') {
             steps {
                 script {
-                    def meta = [
-                        branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
-                        commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
-                        author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
-                    ]
 
-                    // ✅ save to file
+                     // ✅ save to file
                     def state = load 'jenkins/helpers/state.groovy'
                     state.save(meta)
 
@@ -257,6 +252,14 @@ pipeline {
                     echo "Branch: ${env.GIT_BRANCH}"
                     echo "Commit: ${env.SHORT_COMMIT}"
                     echo "Author: ${env.GIT_AUTHOR}"
+
+                    def meta = [
+                        branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
+                        commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
+                        author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
+                    ]
+
+                    
                 }
             }
         }
@@ -379,7 +382,7 @@ pipeline {
 
 def safeState() {
     try {
-        def state = load 'jenkins/helpers/state.groovy'
+        def state = load 'jenkins/helpers/notify.groovy'
         return state.load()
     } catch (err) {
         return [branch: 'unknown', author: 'unknown', commit: 'unknown']
