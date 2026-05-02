@@ -7,23 +7,38 @@ def call(config) {
         script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
     ).trim().split("\\|")
 
-    // ✅ robust branch detection
-    
+    // =========================
+    // BRANCH DETECTION (FIXED)
+    // =========================
+    def branch = env.BRANCH_NAME
 
-    def branch = env.BRANCH_NAME ?: sh(
-    returnStdout: true,
-    script: 'git rev-parse --abbrev-ref HEAD'
-    
-    ).trim()
+    if (!branch || branch == 'null') {
+        branch = sh(
+            returnStdout: true,
+            script: 'git rev-parse --abbrev-ref HEAD || echo "unknown"'
+        ).trim()
+    }
 
     if (!branch || branch == 'HEAD') {
         branch = sh(
             returnStdout: true,
-            script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||" | tr -d " "'
+            script: '''
+                git branch -r --contains HEAD 2>/dev/null \
+                | head -n 1 \
+                | sed "s|origin/||" \
+                | tr -d " " \
+                || echo "unknown"
+            '''
         ).trim()
     }
 
+    if (!branch) {
+        branch = "unknown"
+    }
 
+    // =========================
+    // BUILD CONFIG
+    // =========================
     config.branch = branch
     config.author = gitInfo[0]
     config.email  = gitInfo[1]
@@ -31,6 +46,9 @@ def call(config) {
     config.full   = gitInfo[3]
     config.start  = System.currentTimeMillis()
 
+    // =========================
+    // PERSIST STATE
+    // =========================
     sh 'mkdir -p jenkins/state'
     state.save(config)
 
