@@ -52,6 +52,10 @@ def call(config) {
     sh 'mkdir -p jenkins/state'
     state.save(config)
 
+    env.DETECTED_BRANCH = config.branch
+    env.GIT_AUTHOR      = config.author
+    env.SHORT_COMMIT    = config.commit
+
     echo """
     ─── PIPELINE INIT ───
     Branch : ${config.branch}
@@ -59,6 +63,10 @@ def call(config) {
     Commit : ${config.commit}
     ─────────────────────
     """
-}
+
+//     env.DETECTED_BRANCH = config.branch
+//     env.GIT_AUTHOR      = config.author
+//     env.SHORT_COMMIT    = config.commit
+// }
 
 return this

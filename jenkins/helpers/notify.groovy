@@ -7,12 +7,8 @@ def send(String title, String message) {
 }
 
 def getState() {
-    def file = 'jenkins/state/pipeline-meta.json'
-
-    if (fileExists(file)) {
-        return readJSON(file: file)
-    } 
-        return [:]
+    def state = load 'jenkins/helpers/state.groovy'
+    return state.load() ?: [:]
 }
 
 def pipelineSucceeded() {
