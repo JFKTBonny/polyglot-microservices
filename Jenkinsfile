@@ -295,50 +295,23 @@ pipeline {
     // POST
     // =======================
     post {
-
         success {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Passed',
-                        """Branch: ${s.branch}
-    Author: ${s.author}
-    Commit: ${s.commit}"""
-                    )
-                }
+            script {
+                load('jenkins/helpers/notify.groovy').pipelineSucceeded()
             }
         }
 
         failure {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Failed',
-                        """Branch: ${s.branch}
-    Failed Stage: ${env.FAILED_STAGE}
-    Author: ${s.author}"""
-                    )
-                }
+            script {
+                load('jenkins/helpers/notify.groovy').pipelineFailed()
             }
         }
 
         always {
-            node('built-in') {
-                script {
-                    def s = safeState()
-                    notify{
-                        'Pipeline Finished',
-                        "All done"
-                        
-                    }
-               }
-            }
+            echo 'Pipeline Finished'
+            cleanWs()
         }
-
+   
         cleanup {
             cleanWs()
         }  
