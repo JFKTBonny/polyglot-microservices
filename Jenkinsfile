@@ -332,7 +332,7 @@ pipeline {
                     def s = safeState()
                     notify{
                         'Pipeline Finished',
-                        cleanWs()
+                        "All done"
                         
                     }
                }
