@@ -243,7 +243,7 @@ pipeline {
                         def pf = load 'jenkins/stages/preflight.groovy'
                         pf.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = "Pre-flight"
+                        env.FAILED_STAGE = 'Pre-flight'
                         throw err
                     }
                 }
@@ -251,11 +251,8 @@ pipeline {
             post {
                 failure {
                     script {
-                        def s = safeState()
-                        notify(
-                            'Pre-flight Failed',
-                            "Branch: ${s.branch}\nFix branch name or commit message"
-                        )
+                        notify('Pre-flight Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nFix branch name or commit message")
                     }
                 }
             }
@@ -271,7 +268,7 @@ pipeline {
                         def sd = load 'jenkins/stages/secret-detection.groovy'
                         sd.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = "Secret Detection"
+                        env.FAILED_STAGE = 'Secret Detection'
                         throw err
                     }
                 }
@@ -279,17 +276,12 @@ pipeline {
             post {
                 failure {
                     script {
-                        def s = safeState()
-                        notify(
-                            'CRITICAL — Secrets GIT',
-                            "Branch: ${s.branch}\nRotate credentials immediately"
-                        )
+                        notify('CRITICAL — Secrets Detected',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nRotate credentials immediately")
                     }
                 }
             }
         }
-
-    }
 
     // =======================
     // POST
