@@ -6,6 +6,8 @@ def getFile() {
 }
 
 def save(Map data) {
+    sh "mkdir -p jenkins/state"   // 👈 ADD THIS LINE
+
     writeFile file: getFile(),
         text: JsonOutput.prettyPrint(JsonOutput.toJson(data))
 }
