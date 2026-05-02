@@ -350,19 +350,10 @@ pipeline {
 
 
 def safeState() {
-    def state = [:]
-
-    try {
-        def s = load 'jenkins/helpers/state.groovy'
-        state = s.load() ?: [:]
-    } catch (e) {
-        echo "state file not available: ${e.message}"
-    }
-
     return [
-        branch: state.branch ?: env.DETECTED_BRANCH ?: 'unknown',
-        commit: state.commit ?: env.SHORT_COMMIT ?: 'unknown',
-        author: state.author ?: env.GIT_AUTHOR ?: 'unknown'
+        branch: env.DETECTED_BRANCH ?: 'unknown',
+        commit: env.SHORT_COMMIT ?: 'unknown',
+        author: env.GIT_AUTHOR ?: 'unknown'
     ]
 }
 
