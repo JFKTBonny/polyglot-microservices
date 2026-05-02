@@ -243,7 +243,7 @@ pipeline {
                         def pf = load 'jenkins/stages/preflight.groovy'
                         pf.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = 'Pre-flight'
+                        env.FAILED_STAGE = "Pre-flight"
                         throw err
                     }
                 }
@@ -251,8 +251,11 @@ pipeline {
             post {
                 failure {
                     script {
-                        notify('Pre-flight Failed',
-                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nFix branch name or commit message")
+                        def s = safeState()
+                        notify(
+                            'Pre-flight Failed',
+                            "Branch: ${s.branch}\nFix branch name or commit message"
+                        )
                     }
                 }
             }
@@ -268,7 +271,7 @@ pipeline {
                         def sd = load 'jenkins/stages/secret-detection.groovy'
                         sd.execute()
                     } catch (err) {
-                        env.FAILED_STAGE = 'Secret Detection'
+                        env.FAILED_STAGE = "Secret Detection"
                         throw err
                     }
                 }
@@ -276,40 +279,67 @@ pipeline {
             post {
                 failure {
                     script {
-                        notify('CRITICAL — Secrets Detected',
-                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nRotate credentials immediately")
+                        def s = safeState()
+                        notify(
+                            'CRITICAL — Secrets Detected',
+                            "Branch: ${s.branch}\nRotate credentials immediately"
+                        )
                     }
                 }
             }
         }
     }
+    
     // =======================
     // POST
     // =======================
     post {
+
         success {
             node('built-in') {
                 script {
-                    load('jenkins/helpers/notify.groovy').pipelineSucceeded()
+                    def s = safeState()
+
+                    notify(
+                        'Pipeline Passed',
+                        """Branch: ${s.branch}
+Author: ${s.author}
+Commit: ${s.commit}"""
+                    )
                 }
             }
         }
+
         failure {
             node('built-in') {
                 script {
-                    load('jenkins/helpers/notify.groovy').pipelineFailed()
+                    def s = safeState()
+
+                    notify(
+                        'Pipeline Failed',
+                        """Branch: ${s.branch}
+Failed Stage: ${env.FAILED_STAGE}
+Author: ${s.author}"""
+                    )
                 }
             }
         }
+
         always {
             node('built-in') {
                 script {
-                    echo 'Pipeline Finished'
+                    def duration = env.PIPELINE_START_TIME
+                        ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
+                        : 0
+
+                    echo "Pipeline duration: ${duration}s"
+
                     cleanWs()
                 }
             }
         }
     }
+
 }
 
 
