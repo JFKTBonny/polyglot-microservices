@@ -7,11 +7,26 @@ def call(config) {
         script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
     ).trim().split("\\|")
 
-    // ✅ FIXED: use git native command instead of grep
-    def branch = env.BRANCH_NAME ?: sh(
-        returnStdout: true,
-        script: 'git branch --show-current'
-    ).trim()
+    // ✅ robust branch detection
+    def branch = env.GIT_BRANCH
+
+    if (!branch) {
+        branch = sh(
+            returnStdout: true,
+            script: 'git branch --show-current'
+        ).trim()
+    }
+
+    if (!branch) {
+        branch = sh(
+            returnStdout: true,
+            script: 'git rev-parse --abbrev-ref HEAD'
+        ).trim()
+    }
+
+    if (branch == 'HEAD' || !branch) {
+        branch = env.GIT_BRANCH ?: 'unknown'
+    }
 
     config.branch = branch
     config.author = gitInfo[0]
@@ -20,10 +35,7 @@ def call(config) {
     config.full   = gitInfo[3]
     config.start  = System.currentTimeMillis()
 
-    // ensure directory exists
     sh 'mkdir -p jenkins/state'
-
-    // save state
     state.save(config)
 
     echo """
