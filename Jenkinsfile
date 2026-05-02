@@ -216,23 +216,58 @@ pipeline {
         stage('Init') {
             steps {
                 script {
-                    // Debug raw output
-                    sh "git log -1 --format='%an|%ae|%h|%H'"
-                    sh 'git log -1 --format="%an|%ae|%h|%H"'
-                    sh "git log -1 --pretty=format:%an"
+                    try {
+                        def raw = sh(
+                            returnStdout: true,
+                            script: "git log -1 --format=%an|%ae|%h|%H"
+                        ).trim()
 
-                    def raw1 = sh(returnStdout: true,
-                        script: "git log -1 --format='%an|%ae|%h|%H'").trim()
-                    def raw2 = sh(returnStdout: true,
-                        script: 'git log -1 --format="%an|%ae|%h|%H"').trim()
-                    def raw3 = sh(returnStdout: true,
-                        script: "git log -1 --pretty=format:%an").trim()
+                        def parts = raw.tokenize('|')
 
-                    echo "raw1: '${raw1}'"
-                    echo "raw2: '${raw2}'"
-                    echo "raw3: '${raw3}'"
-                    echo "raw1 length: ${raw1.length()}"
-                    echo "raw3 length: ${raw3.length()}"
+                        def author = parts.size() > 0 ? parts[0] : 'unknown'
+                        def email  = parts.size() > 1 ? parts[1] : 'unknown'
+                        def shortC = parts.size() > 2 ? parts[2] : 'unknown'
+                        def fullC  = parts.size() > 3 ? parts[3] : 'unknown'
+
+                        def branch = env.BRANCH_NAME ?: sh(
+                            returnStdout: true,
+                            script: 'git rev-parse --abbrev-ref HEAD'
+                        ).trim()
+
+                        if (!branch || branch == 'HEAD') {
+                            branch = sh(
+                                returnStdout: true,
+                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||" | tr -d " "'
+                            ).trim()
+                        }
+
+                        env.DETECTED_BRANCH  = branch  ?: 'unknown'
+                        env.GIT_AUTHOR       = author  ?: 'unknown'
+                        env.GIT_AUTHOR_EMAIL = email   ?: 'unknown'
+                        env.SHORT_COMMIT     = shortC  ?: 'unknown'
+                        env.FULL_COMMIT      = fullC   ?: 'unknown'
+                        env.PIPELINE_START   = System.currentTimeMillis().toString()
+
+                        // Write state file for parallel stages
+                        writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
+GIT_AUTHOR=${env.GIT_AUTHOR}
+SHORT_COMMIT=${env.SHORT_COMMIT}
+PIPELINE_START=${env.PIPELINE_START}"""
+
+                        // Stash state file so post{} can read it
+                        stash name: 'pipeline-state', includes: '.pipeline-state'
+
+                        echo """
+─── PIPELINE INIT ───────────────────
+Branch : ${env.DETECTED_BRANCH}
+Author : ${env.GIT_AUTHOR}
+Commit : ${env.SHORT_COMMIT}
+─────────────────────────────────────
+                        """
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Init'
+                        throw err
+                    }
                 }
             }
         }
@@ -366,6 +401,7 @@ def safeState() {
         author: env.GIT_AUTHOR      ?: 'unknown'
     ]
     try {
+        unstash 'pipeline-state'
         if (fileExists('.pipeline-state')) {
             readFile('.pipeline-state').split('\n').each { line ->
                 def parts = line.split('=', 2)
@@ -377,7 +413,7 @@ def safeState() {
             }
         }
     } catch (e) {
-        echo "safeState read error: ${e.message}"
+        echo "safeState: using env vars — ${e.message}"
     }
     return state
 }
