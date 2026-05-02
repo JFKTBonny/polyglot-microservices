@@ -299,13 +299,13 @@ pipeline {
             node('built-in') {
                 script {
                     def s = safeState()
-                    def branch = s.branch ?: 'unknown'
+                    def branch = (s?.branch ?: (env.BRANCH_NAME ?: 'unknown')).toString()
 
                     notify(
                         'Pipeline Passed',
                         """Branch: ${branch}
-    Author: ${s.author ?: 'unknown'}
-    Commit: ${s.commit ?: 'unknown'}"""
+    Author: ${s?.author ?: 'unknown'}
+    Commit: ${s?.commit ?: 'unknown'}"""
                     )
                 }
             }
@@ -315,14 +315,14 @@ pipeline {
             node('built-in') {
                 script {
                     def s = safeState()
-                    def branch = s.branch ?: 'unknown'
-                    def failedStage = env.FAILED_STAGE ?: 'unknown'
+                    def branch = (s?.branch ?: (env.BRANCH_NAME ?: 'unknown')).toString()
+                    def failedStage = (env.FAILED_STAGE ?: 'unknown').toString()
 
                     notify(
                         'Pipeline Failed',
                         """Branch: ${branch}
     Failed Stage: ${failedStage}
-    Author: ${s.author ?: 'unknown'}"""
+    Author: ${s?.author ?: 'unknown'}"""
                     )
                 }
             }
