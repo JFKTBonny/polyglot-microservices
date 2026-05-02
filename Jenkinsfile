@@ -235,34 +235,8 @@ pipeline {
         // =======================
         // INIT METADATA (FIXED)
         // =======================
-        stage('Init Metadata') {
-            steps {
-                script {
-
-                     // ✅ save to file
-                    def state = load 'jenkins/helpers/state.groovy'
-                    state.save(meta)
-
-                    // ✅ ALSO save to env (CRITICAL FIX)
-                    env.GIT_BRANCH = meta.branch
-                    env.SHORT_COMMIT    = meta.commit
-                    env.GIT_AUTHOR      = meta.author
-
-                    echo "Metadata initialized:"
-                    echo "Branch: ${env.GIT_BRANCH}"
-                    echo "Commit: ${env.SHORT_COMMIT}"
-                    echo "Author: ${env.GIT_AUTHOR}"
-
-                    // def meta = [
-                    //     branch: sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim(),
-                    //     commit: sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim(),
-                    //     author: sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
-                    // ]
-
-                    
-                }
-            }
-        }
+        
+           
 
         // =======================
         // PRE-FLIGHT
