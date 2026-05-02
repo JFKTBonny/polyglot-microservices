@@ -217,15 +217,43 @@ pipeline {
             steps {
                 script {
                     try {
-                        def config = [:]
+                        def gitInfo = sh(
+                            returnStdout: true,
+                            script: 'git log -1 --pretty=format:"%an|%ae|%h|%H"'
+                        ).trim().split("\\|")
 
-                        def initStage = load 'jenkins/stages/init.groovy'
-                        initStage.call(config)
+                        def branch = env.BRANCH_NAME ?: sh(
+                            returnStdout: true,
+                            script: 'git rev-parse --abbrev-ref HEAD'
+                        ).trim()
 
-                        env.PIPELINE_START_TIME = System.currentTimeMillis().toString()
+                        if (branch == 'HEAD') {
+                            branch = sh(
+                                returnStdout: true,
+                                script: 'git branch -r --contains HEAD | head -n 1 | sed "s|origin/||"'
+                            ).trim()
+                        }
 
+                        env.DETECTED_BRANCH = branch?.trim()   ?: 'unknown'
+                        env.GIT_AUTHOR      = gitInfo[0]?.trim() ?: 'unknown'
+                        env.SHORT_COMMIT    = gitInfo[2]?.trim() ?: 'unknown'
+                        env.PIPELINE_START  = System.currentTimeMillis().toString()
+
+                        // Write state file — readable by parallel stages
+                        writeFile file: '.pipeline-state', text: """DETECTED_BRANCH=${env.DETECTED_BRANCH}
+GIT_AUTHOR=${env.GIT_AUTHOR}
+SHORT_COMMIT=${env.SHORT_COMMIT}
+PIPELINE_START=${env.PIPELINE_START}"""
+
+                        echo """
+─── PIPELINE INIT ───────────────────
+Branch : ${env.DETECTED_BRANCH}
+Author : ${env.GIT_AUTHOR}
+Commit : ${env.SHORT_COMMIT}
+─────────────────────────────────────
+                        """
                     } catch (err) {
-                        env.FAILED_STAGE = "Init"
+                        env.FAILED_STAGE = 'Init'
                         throw err
                     }
                 }
@@ -355,12 +383,26 @@ pipeline {
 
 
 def safeState() {
+    def state = [
+        branch: env.DETECTED_BRANCH ?: 'unknown',
+        commit: env.SHORT_COMMIT    ?: 'unknown',
+        author: env.GIT_AUTHOR      ?: 'unknown'
+    ]
     try {
-        def state = load 'jenkins/helpers/state.groovy'
-        return state.load()
-    } catch (err) {
-        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
+        if (fileExists('.pipeline-state')) {
+            readFile('.pipeline-state').split('\n').each { line ->
+                def parts = line.split('=', 2)
+                if (parts.size() == 2) {
+                    if (parts[0] == 'DETECTED_BRANCH') state.branch = parts[1]
+                    if (parts[0] == 'GIT_AUTHOR')      state.author = parts[1]
+                    if (parts[0] == 'SHORT_COMMIT')    state.commit = parts[1]
+                }
+            }
+        }
+    } catch (e) {
+        echo "safeState read error: ${e.message}"
     }
+    return state
 }
 
 def notify(String title, String message) {

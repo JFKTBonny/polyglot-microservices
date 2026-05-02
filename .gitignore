@@ -50,3 +50,7 @@ Thumbs.db
 
 ## ── Go sum (regenerated) ──────────────────────────
 # keep go.sum — it ensures reproducible builds
+
+Test_tls-ingress/
+*.key
+test_Auth_functionality.txt
