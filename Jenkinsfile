@@ -219,7 +219,7 @@ pipeline {
                     try {
                         // Single quotes around format to avoid shell interpretation
                         def author = sh(returnStdout: true,
-                            script: "git log -1 --pretty=format:'%an'").trim().replaceAll("'", "")
+                            script: 'git log -1 --pretty=format:"%an"').trim().replaceAll("'", "")
                         def email  = sh(returnStdout: true,
                             script: "git log -1 --pretty=format:'%ae'").trim().replaceAll("'", "")
                         def shortC = sh(returnStdout: true,
