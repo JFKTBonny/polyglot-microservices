@@ -297,13 +297,15 @@ pipeline {
     post {
         success {
             script {
-                load('jenkins/helpers/notify.groovy').pipelineSucceeded()
+                def notify = load 'jenkins/helpers/notify.groovy'
+                notify.pipelineSucceeded()
             }
         }
 
         failure {
             script {
-                load('jenkins/helpers/notify.groovy').pipelineFailed()
+                def notify = load 'jenkins/helpers/notify.groovy'
+                notify.pipelineFailed()
             }
         }
 
