@@ -327,19 +327,15 @@ pipeline {
         }
 
         always {
-            node('built-in') {
-                script {
-                    def duration = env.PIPELINE_START_TIME
-                        ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
-                        : 0
-
-                    echo "Pipeline duration: ${duration}s"
-
-                    // ✅ NOW VALID
-                    cleanWs()
-                }
+            script {
+                def notify = load 'jenkins/helpers/notify.groovy'
+                notify.pipelineSucceeded()
             }
-        }    
+        }
+
+        cleanup {
+            cleanWs()
+        }  
     }
 }
 

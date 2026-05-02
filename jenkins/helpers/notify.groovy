@@ -2,7 +2,7 @@ def send(String title, String message) {
     echo "════════════════════════════════════"
     echo "  ${title}"
     echo "════════════════════════════════════"
-    echo message.trim()
+    echo message?.trim()
     echo "════════════════════════════════════"
 }
 
@@ -18,7 +18,7 @@ def pipelineSucceeded() {
 Branch: ${s.branch ?: 'unknown'}
 Author: ${s.author ?: 'unknown'}
 Commit: ${s.commit ?: 'unknown'}
-    """)
+""")
 }
 
 def pipelineFailed() {
@@ -28,8 +28,8 @@ def pipelineFailed() {
 Branch: ${s.branch ?: 'unknown'}
 Author: ${s.author ?: 'unknown'}
 Commit: ${s.commit ?: 'unknown'}
-Stage:  ${env.FAILED_STAGE ?: 'unknown'}
-    """)
+Stage: ${env.FAILED_STAGE ?: 'unknown'}
+""")
 }
 
 return this
