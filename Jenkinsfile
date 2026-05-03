@@ -258,6 +258,27 @@ pipeline {
                 }
             }
         }
+
+
+        stage('DAST') {
+            steps {
+                script {
+                    try {
+                        def dast = load 'jenkins/stages/dast.groovy'
+                        dast.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'DAST'
+                        // Always cleanup on failure
+                        sh '''
+                            docker ps -a --filter "name=dast-" --format "{{.Names}}" | \
+                                xargs -r docker rm -f 2>/dev/null || true
+                            docker network rm dast-net 2>/dev/null || true
+                        '''
+                        throw err
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
