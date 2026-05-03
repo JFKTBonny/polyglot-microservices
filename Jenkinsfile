@@ -306,6 +306,20 @@ pipeline {
                 }
             }
         }
+
+        stage('SBOM') {
+            steps {
+                script {
+                    try {
+                        def sbom = load 'jenkins/stages/sbom.groovy'
+                        sbom.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'SBOM'
+                        throw err
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
