@@ -137,9 +137,7 @@ exit $FAILED
         echo "Running govulncheck — inventory-service..."
 
         writeFile file: 'govuln.sh', text: '''#!/bin/bash
-SERVICE="inventory-service"
-
-if [ ! -f "$SERVICE/go.mod" ]; then
+if [ ! -f "inventory-service/go.mod" ]; then
     echo "No go.mod found — skipping"
     exit 0
 fi
@@ -147,8 +145,7 @@ fi
 go install golang.org/x/vuln/cmd/govulncheck@latest 2>/dev/null || true
 export PATH=$PATH:$(go env GOPATH)/bin
 
-# Run from repo root pointing to service
-govulncheck ./$SERVICE/... 2>&1 | tee govuln-report.txt || true
+govulncheck -C inventory-service ./... 2>&1 | tee govuln-report.txt || true
 
 if grep -q "Vulnerability #" govuln-report.txt; then
     echo "Vulnerabilities found — review report"
