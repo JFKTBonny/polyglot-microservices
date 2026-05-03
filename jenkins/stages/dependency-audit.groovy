@@ -180,7 +180,7 @@ mvn org.owasp:dependency-check-maven:check \
     -DskipTestScope=true \
     -Dformat=JSON \
     -DoutputDirectory=../owasp-report \
-    -DnvdDatafeedUrl=off \
+    -DautoUpdate=false \
     --no-transfer-progress \
     2>/dev/null || true
 
