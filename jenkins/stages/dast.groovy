@@ -152,28 +152,25 @@ fi
             echo "  ${name}: HIGH=${r.high}, MEDIUM=${r.medium}"
         }
 
-        if (fileExists('zap-reports')) {
-            stash name: 'zap-reports', includes: 'zap-reports/**'
-            echo "ZAP reports stashed"
+        // Write a placeholder if no reports were generated
+        def reportFiles = sh(script: 'ls zap-reports/ 2>/dev/null | wc -l', returnStdout: true).trim().toInteger()
+        if (reportFiles == 0) {
+            writeFile file: 'zap-reports/zap-summary.txt', text: 'ZAP scans ran - services not reachable, no findings recorded'
+            echo "No ZAP report files produced - services were not reachable"
         }
-    }
 
+        stash name: 'zap-reports', includes: 'zap-reports/**'
+        echo "ZAP reports stashed"
 
     // #################### 10.4 Cleanup #####################################################
     stage('DAST Cleanup') {
         echo "Cleaning up DAST containers..."
-
-        writeFile file: 'dast-cleanup.sh', text: '''#!/bin/bash
-# Stop and remove DAST containers
-docker ps -a --filter "name=dast-" --format "{{.Names}}" | \
-    xargs -r docker rm -f 2>/dev/null || true
-
-# Remove DAST network
-docker network rm dast-net 2>/dev/null || true
-
-echo "DAST cleanup complete"
-'''
-        sh 'bash dast-cleanup.sh && rm -f dast-cleanup.sh'
+        sh '''
+            docker ps -a --filter "name=dast-" --format "{{.Names}}" | \
+                xargs -r docker rm -f 2>/dev/null || true
+            docker network rm dast-net 2>/dev/null || true
+            echo "DAST cleanup complete"
+        '''
     }
 
     echo "Stage 10 complete - DAST finished"
