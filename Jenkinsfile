@@ -288,41 +288,32 @@ pipeline {
     // POST
     // =======================
     post {
-    success {
-        // Use 'built-in' only if the notification logic requires it
-        node('built-in') {
-            script {
-                // Use a safe getter to prevent script termination on nulls
-                def s = getSafeState()
-                notify("✅ Pipeline Passed", 
-                    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}")
+        success {
+            node('built-in') {
+                script {
+                    def s = getSafeState()
+                    notify("✅ Pipeline Passed", "Branch: ${s.branch}\nAuthor: ${s.author}")
+                }
+            }
+        }
+        failure {
+            node('built-in') {
+                script {
+                    def s = getSafeState()
+                    notify("❌ Pipeline Failed", "Branch: ${s.branch}\nFailed at: ${env.STAGE_NAME}")
+                }
+            }
+        }
+        always {
+            node('built-in') {
+                script {
+                    // This must match the function name defined below
+                    logPipelineDuration() 
+                    cleanWs()
+                }
             }
         }
     }
-
-    failure {
-        node('built-in') {
-            script {
-                def s = getSafeState()
-                // env.STAGE_NAME is a built-in Jenkins variable
-                def failedAt = env.STAGE_NAME ?: "Unknown Stage"
-                
-                notify("❌ Pipeline Failed", 
-                    "Branch: ${s.branch}\nFailed at: ${failedAt}\nAuthor: ${s.author}")
-            }
-        }
-    }
-
-    always {
-        // Always clean up to prevent disk space issues
-        node('built-in') {
-            script {
-                calculateAndLogDuration()
-                cleanWs(deleteDirs: false, disableDeferredWipeout: false)
-            }
-        }
-    }
-}
 }
 
 
@@ -332,65 +323,33 @@ pipeline {
 // =======================
 // 🔧 SAFE HELPERS (FIXED)
 // =======================
-
 import groovy.json.JsonSlurper
 
-/**
- * Safely retrieves pipeline metadata by unstashing and parsing the state JSON.
- * Designed to be called within a script block inside post-actions.
- */
 def getSafeState() {
-    def state = [
-        branch: 'unknown',
-        author: 'unknown',
-        commit: 'unknown'
-    ]
-
+    def state = [branch: 'unknown', author: 'unknown', commit: 'unknown']
     try {
-        // Unstash the file into the current node's workspace
         unstash 'pipeline-state'
-        
         def jsonPath = "jenkins/state/pipeline-meta.json"
         if (fileExists(jsonPath)) {
-            def fileContent = readFile(jsonPath)
-            def json = new JsonSlurper().parseText(fileContent)
-            
+            def json = new JsonSlurper().parseText(readFile(jsonPath))
             state.branch = json.branch ?: state.branch
             state.author = json.author ?: state.author
             state.commit = json.commit ?: state.commit
         }
-    } catch (Exception e) {
-        // If Init stage failed or stash is missing, we log a warning but don't break the build
-        echo "⚠️ Helper: Could not retrieve pipeline-state stash. Using defaults. (${e.message})"
-    }
-    
+    } catch (e) { echo "⚠️ State fetch failed: ${e.message}" }
     return state
 }
 
-/**
- * Formats and prints a consistent notification block to the console.
- */
 def notify(String title, String message) {
-    echo """
-══════════════════════════════════════════════════════
-  ${title}
-══════════════════════════════════════════════════════
-${message?.trim()}
-══════════════════════════════════════════════════════
-"""
+    echo "════════════════════════════════════\n  ${title}\n════════════════════════════════════\n${message?.trim()}\n════════════════════════════════════"
 }
 
-/**
- * Calculates build duration using Jenkins built-in timing metadata.
- */
+// MAKE SURE THIS NAME MATCHES YOUR POST BLOCK CALL
 def logPipelineDuration() {
     try {
         if (currentBuild.startTimeInMillis) {
-            def durationMs = System.currentTimeMillis() - currentBuild.startTimeInMillis
-            def durationSec = (durationMs / 1000).toInteger()
-            echo "⏱️ Total Pipeline Duration: ${durationSec}s"
+            def duration = ((System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000).toInteger()
+            echo "⏱️ Pipeline duration: ${duration}s"
         }
-    } catch (e) {
-        echo "⏱️ Total Pipeline Duration: N/A"
-    }
+    } catch (e) { echo "⏱️ Duration: N/A" }
 }
