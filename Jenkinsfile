@@ -36,8 +36,12 @@ pipeline {
                     def initStage = load 'jenkins/stages/init.groovy'
                     initStage(config)
 
-                    // persist across nodes
-                    stash name: 'pipeline-state', includes: 'jenkins/state/*'
+                    echo "Saved config: branch=${config.branch}, author=${config.author}, commit=${config.commit}"
+
+                    sh 'ls -lah jenkins/state || true'
+                    sh 'test -f jenkins/state/pipeline-meta.json && echo "pipeline-meta.json exists"'
+
+                    stash name: 'pipeline-state', includes: 'jenkins/state/pipeline-meta.json'
                 }
             }
         }
