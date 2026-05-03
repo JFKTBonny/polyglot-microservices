@@ -340,12 +340,11 @@ Author: ${s.author}"""
 // =======================
 
 def safeState() {
-    // temporarily: no state file; just give safe defaults
-    return [
-        branch: env.BRANCH_NAME ?: 'unknown',
-        author: env.GIT_AUTHOR_NAME ?: 'unknown',
-        commit: env.GIT_COMMIT ?: 'unknown'
-    ]
+  return [
+    branch: env.BRANCH_NAME ?: 'unknown',
+    author: env.GIT_AUTHOR_NAME ?: 'unknown',
+    commit: env.GIT_COMMIT ?: 'unknown'
+  ]
 }
 
 def notify(String title, String message) {

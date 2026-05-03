@@ -6,30 +6,16 @@ def execute() {
     tools.printVersions()
 
     // Read state written by Init stage
-    def state = load 'jenkins/helpers/state.groovy'
+    def stateScript = load 'jenkins/helpers/state.groovy'
+    def state = stateScript.load()
 
-    state.branch = 'unknown'
-    state.author = 'unknown'
-    state.commit = 'unknown'
+    state.branch = state.branch ?: 'unknown'
+    state.author = state.author ?: 'unknown'
+    state.commit = state.commit ?: 'unknown'
 
-    try {
-        if (fileExists('.pipeline-state')) {
-            readFile('.pipeline-state').split('\n').each { line ->
-                def parts = line.split('=', 2)
-                if (parts.size() == 2) {
-                    if (parts[0] == 'DETECTED_BRANCH') state.branch = parts[1]
-                    if (parts[0] == 'GIT_AUTHOR')      state.author = parts[1]
-                    if (parts[0] == 'SHORT_COMMIT')    state.commit = parts[1]
-                }
-            }
-        }
-    } catch (e) {
-        echo "Could not read state file: ${e.message}"
-    }
-
-    echo "Branch: ${state.branch ?: 'unknown'}"
-    echo "Author: ${state.author ?: 'unknown'}"
-    echo "Commit: ${state.commit ?: 'unknown'}"
+    echo "Branch: ${state.branch}"
+    echo "Author: ${state.author}"
+    echo "Commit: ${state.commit}"
 
     parallel(
 
