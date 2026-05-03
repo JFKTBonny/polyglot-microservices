@@ -305,9 +305,23 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def branch = env.DETECTED_BRANCH ?: 'unknown'
-                    def author = env.GIT_AUTHOR     ?: 'unknown'
-                    def commit = env.SHORT_COMMIT    ?: 'unknown'
+                    def branch = 'unknown'
+                    def author = 'unknown'
+                    def commit = 'unknown'
+                    try {
+                        unstash 'pipeline-state'
+                        def lines = readFile('.pipeline-state').split('\n')
+                        for (int i = 0; i < lines.size(); i++) {
+                            def idx = lines[i].indexOf('=')
+                            if (idx > 0) {
+                                def k = lines[i].substring(0, idx)
+                                def v = lines[i].substring(idx + 1)
+                                if (k == 'DETECTED_BRANCH') branch = v
+                                if (k == 'GIT_AUTHOR')      author = v
+                                if (k == 'SHORT_COMMIT')    commit = v
+                            }
+                        }
+                    } catch (e) { echo "Could not read state: ${e.message}" }
                     echo """
 ════════════════════════════════════
   ✅ Pipeline Passed
@@ -323,15 +337,31 @@ Commit: ${commit}
         failure {
             node('built-in') {
                 script {
-                    def branch = env.DETECTED_BRANCH ?: 'unknown'
-                    def author = env.GIT_AUTHOR      ?: 'unknown'
-                    def failed = env.FAILED_STAGE    ?: 'unknown'
+                    def branch = 'unknown'
+                    def author = 'unknown'
+                    def commit = 'unknown'
+                    try {
+                        unstash 'pipeline-state'
+                        def lines = readFile('.pipeline-state').split('\n')
+                        for (int i = 0; i < lines.size(); i++) {
+                            def idx = lines[i].indexOf('=')
+                            if (idx > 0) {
+                                def k = lines[i].substring(0, idx)
+                                def v = lines[i].substring(idx + 1)
+                                if (k == 'DETECTED_BRANCH') branch = v
+                                if (k == 'GIT_AUTHOR')      author = v
+                                if (k == 'SHORT_COMMIT')    commit = v
+                            }
+                        }
+                    } catch (e) { echo "Could not read state: ${e.message}" }
+                    def failed = env.FAILED_STAGE ?: 'unknown'
                     echo """
 ════════════════════════════════════
   ❌ Pipeline Failed
 ════════════════════════════════════
 Branch: ${branch}
 Author: ${author}
+Commit: ${commit}
 Failed Stage: ${failed}
 ════════════════════════════════════
 """
@@ -339,8 +369,13 @@ Failed Stage: ${failed}
             }
         }
     }
-}
 
+
+
+
+
+
+}
 
 
 
