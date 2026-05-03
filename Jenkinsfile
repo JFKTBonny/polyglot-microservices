@@ -318,7 +318,7 @@ pipeline {
         node('built-in') {
             script {
                 calculateAndLogDuration()
-                cleanWs(deleteDirs: true, disableDeferredWipeout: true)
+                cleanWs(deleteDirs: false, disableDeferredWipeout: false)
             }
         }
     }
