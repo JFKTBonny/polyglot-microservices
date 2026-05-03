@@ -16,38 +16,29 @@ def execute() {
     def shortCommit = env.SHORT_COMMIT    ?: 'latest'
     def buildTag    = "${branch}-${shortCommit}".replaceAll('/', '-')
 
-
-    // #################### 10.1 Pull ZAP image #####################################################
+    // ── 10.1 Pull ZAP image ───────────────────────────────────
     stage('Pull ZAP Image') {
         echo "Pulling OWASP ZAP image..."
         sh 'docker pull ghcr.io/zaproxy/zaproxy:stable 2>&1 | tail -3'
         echo "ZAP image ready"
     }
 
-
-    // #################### 10.2 Start services #####################################################
+    // ── 10.2 Start services ───────────────────────────────────
     stage('Start Services') {
         echo "Starting services for DAST scanning..."
 
         writeFile file: 'start-services.sh', text: """#!/bin/bash
 set -e
-
-# Create DAST network
 docker network create dast-net 2>/dev/null || true
-
 TAG="${buildTag}"
 
-# Start each service detached
 docker run -d --name dast-user-service \\
     --network dast-net \\
-    -e NODE_ENV=test \\
-    -e DB_HOST=localhost \\
-    -e JWT_SECRET=test-secret \\
+    -e NODE_ENV=test -e DB_HOST=localhost -e JWT_SECRET=test-secret \\
     santonix/user-service:\$TAG 2>/dev/null || true
 
 docker run -d --name dast-order-service \\
-    --network dast-net \\
-    -e PYTHONPATH=/app \\
+    --network dast-net -e PYTHONPATH=/app \\
     santonix/order-service:\$TAG 2>/dev/null || true
 
 docker run -d --name dast-inventory-service \\
@@ -55,8 +46,7 @@ docker run -d --name dast-inventory-service \\
     santonix/inventory-service:\$TAG 2>/dev/null || true
 
 docker run -d --name dast-payment-service \\
-    --network dast-net \\
-    -e SPRING_PROFILES_ACTIVE=test \\
+    --network dast-net -e SPRING_PROFILES_ACTIVE=test \\
     santonix/payment-service:\$TAG 2>/dev/null || true
 
 docker run -d --name dast-analytics-service \\
@@ -64,8 +54,7 @@ docker run -d --name dast-analytics-service \\
     santonix/analytics-service:\$TAG 2>/dev/null || true
 
 docker run -d --name dast-auth-service \\
-    --network dast-net \\
-    -e JWT_SECRET=test-secret \\
+    --network dast-net -e JWT_SECRET=test-secret \\
     santonix/auth-service:\$TAG 2>/dev/null || true
 
 echo "Waiting 15s for services to start..."
@@ -77,8 +66,7 @@ docker ps --filter "name=dast-" --format "{{.Names}} {{.Status}}"
         sh 'bash start-services.sh && rm -f start-services.sh'
     }
 
-
-    // #################### 10.3 ZAP Baseline Scans #####################################################
+    // ── 10.3 ZAP Baseline Scans ───────────────────────────────
     stage('ZAP Baseline Scan') {
         echo "Running ZAP baseline scans..."
 
@@ -90,13 +78,11 @@ docker ps --filter "name=dast-" --format "{{.Names}} {{.Status}}"
             def svc    = services[i]
             def name   = svc.name
             def port   = svc.port
-            def path   = svc.path
             def target = "http://dast-${name}:${port}"
 
             writeFile file: "zap-scan-${name}.sh", text: """#!/bin/bash
 SERVICE="${name}"
 TARGET="${target}"
-REPORT="zap-reports/\${SERVICE}.json"
 
 echo "ZAP scanning \$TARGET..."
 
@@ -113,16 +99,16 @@ docker run --rm \\
 
 echo "ZAP scan complete for \$SERVICE"
 
-# Count alerts
 if [ -f "zap-reports/\${SERVICE}.json" ]; then
-    HIGH=\$(cat "zap-reports/\${SERVICE}.json" | grep -o '"riskdesc":"High' | wc -l || echo 0)
-    MEDIUM=\$(cat "zap-reports/\${SERVICE}.json" | grep -o '"riskdesc":"Medium' | wc -l || echo 0)
-    echo "ZAP_HIGH=\$HIGH"
-    echo "ZAP_MEDIUM=\$MEDIUM"
+    HIGH=\$(grep -o '"riskdesc":"High' "zap-reports/\${SERVICE}.json" | wc -l || echo 0)
+    MEDIUM=\$(grep -o '"riskdesc":"Medium' "zap-reports/\${SERVICE}.json" | wc -l || echo 0)
 else
-    echo "ZAP_HIGH=0"
-    echo "ZAP_MEDIUM=0"
+    HIGH=0
+    MEDIUM=0
 fi
+
+echo "ZAP_HIGH=\$HIGH"
+echo "ZAP_MEDIUM=\$MEDIUM"
 """
             def out = sh(script: "bash zap-scan-${name}.sh", returnStdout: true).trim()
             sh "rm -f zap-scan-${name}.sh"
@@ -144,7 +130,6 @@ fi
             echo "${name} — HIGH: ${high}, MEDIUM: ${medium}"
         }
 
-        // Summary
         echo "ZAP Scan Summary:"
         for (int i = 0; i < services.size(); i++) {
             def name = services[i].name
@@ -152,17 +137,18 @@ fi
             echo "  ${name}: HIGH=${r.high}, MEDIUM=${r.medium}"
         }
 
-        // Write a placeholder if no reports were generated
-        def reportFiles = sh(script: 'ls zap-reports/ 2>/dev/null | wc -l', returnStdout: true).trim().toInteger()
-        if (reportFiles == 0) {
-            writeFile file: 'zap-reports/zap-summary.txt', text: 'ZAP scans ran - services not reachable, no findings recorded'
-            echo "No ZAP report files produced - services were not reachable"
+        def reportCount = sh(script: 'ls zap-reports/ 2>/dev/null | wc -l', returnStdout: true).trim().toInteger()
+        if (reportCount == 0) {
+            writeFile file: 'zap-reports/zap-summary.txt',
+                      text: 'ZAP scans ran - services not reachable, no findings recorded'
+            echo "No ZAP report files produced - writing placeholder"
         }
 
         stash name: 'zap-reports', includes: 'zap-reports/**'
         echo "ZAP reports stashed"
+    }
 
-    // #################### 10.4 Cleanup #####################################################
+    // ── 10.4 Cleanup ──────────────────────────────────────────
     stage('DAST Cleanup') {
         echo "Cleaning up DAST containers..."
         sh '''
