@@ -214,6 +214,28 @@ pipeline {
                 }
             }
         }
+
+        stage('Container Scan') {
+            steps {
+                script {
+                    try {
+                        def cs = load 'jenkins/stages/container-scan.groovy'
+                        cs.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Container Scan'
+                        throw err
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        notify('Container Scan Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nContainer scan stage failed")
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
