@@ -1,6 +1,6 @@
 
 
-
+def pipelineState = [branch: 'unknown', author: 'unknown', commit: 'unknown']
 
 pipeline {
     agent any
@@ -283,6 +283,29 @@ pipeline {
                 }
             }
         }
+
+        stage('Capture State') {
+            steps {
+                script {
+                    try {
+                        def lines = readFile('.pipeline-state').split('\n')
+                        for (int i = 0; i < lines.size(); i++) {
+                            def idx = lines[i].indexOf('=')
+                            if (idx > 0) {
+                                def k = lines[i].substring(0, idx)
+                                def v = lines[i].substring(idx + 1)
+                                if (k == 'DETECTED_BRANCH') pipelineState.branch = v
+                                if (k == 'GIT_AUTHOR')      pipelineState.author = v
+                                if (k == 'SHORT_COMMIT')    pipelineState.commit = v
+                            }
+                        }
+                        echo "State captured: ${pipelineState}"
+                    } catch (e) {
+                        echo "Could not capture state: ${e.message}"
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
@@ -305,30 +328,13 @@ pipeline {
         success {
             node('built-in') {
                 script {
-                    def branch = 'unknown'
-                    def author = 'unknown'
-                    def commit = 'unknown'
-                    try {
-                        unstash 'pipeline-state'
-                        def lines = readFile('.pipeline-state').split('\n')
-                        for (int i = 0; i < lines.size(); i++) {
-                            def idx = lines[i].indexOf('=')
-                            if (idx > 0) {
-                                def k = lines[i].substring(0, idx)
-                                def v = lines[i].substring(idx + 1)
-                                if (k == 'DETECTED_BRANCH') branch = v
-                                if (k == 'GIT_AUTHOR')      author = v
-                                if (k == 'SHORT_COMMIT')    commit = v
-                            }
-                        }
-                    } catch (e) { echo "Could not read state: ${e.message}" }
                     echo """
 ════════════════════════════════════
   ✅ Pipeline Passed
 ════════════════════════════════════
-Branch: ${branch}
-Author: ${author}
-Commit: ${commit}
+Branch: ${pipelineState.branch}
+Author: ${pipelineState.author}
+Commit: ${pipelineState.commit}
 ════════════════════════════════════
 """
                 }
@@ -337,31 +343,14 @@ Commit: ${commit}
         failure {
             node('built-in') {
                 script {
-                    def branch = 'unknown'
-                    def author = 'unknown'
-                    def commit = 'unknown'
-                    try {
-                        unstash 'pipeline-state'
-                        def lines = readFile('.pipeline-state').split('\n')
-                        for (int i = 0; i < lines.size(); i++) {
-                            def idx = lines[i].indexOf('=')
-                            if (idx > 0) {
-                                def k = lines[i].substring(0, idx)
-                                def v = lines[i].substring(idx + 1)
-                                if (k == 'DETECTED_BRANCH') branch = v
-                                if (k == 'GIT_AUTHOR')      author = v
-                                if (k == 'SHORT_COMMIT')    commit = v
-                            }
-                        }
-                    } catch (e) { echo "Could not read state: ${e.message}" }
                     def failed = env.FAILED_STAGE ?: 'unknown'
                     echo """
 ════════════════════════════════════
   ❌ Pipeline Failed
 ════════════════════════════════════
-Branch: ${branch}
-Author: ${author}
-Commit: ${commit}
+Branch: ${pipelineState.branch}
+Author: ${pipelineState.author}
+Commit: ${pipelineState.commit}
 Failed Stage: ${failed}
 ════════════════════════════════════
 """
