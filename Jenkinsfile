@@ -148,6 +148,28 @@ pipeline {
                 }
             }
         }
+
+        stage('Code Quality') {
+            steps {
+                script {
+                    try {
+                        def cq = load 'jenkins/stages/code-quality.groovy'
+                        cq.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Code Quality'
+                        throw err
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        notify('Code Quality Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nQuality gate not met")
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
