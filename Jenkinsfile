@@ -288,28 +288,53 @@ pipeline {
     // POST
     // =======================
     post {
+        always {
+            node('built-in') {
+                script {
+                    try {
+                        def duration = currentBuild.startTimeInMillis ?
+                            ((System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000).toInteger() : 0
+                        echo "⏱️ Pipeline duration: ${duration}s"
+                    } catch (e) {
+                        echo "⏱️ Duration: N/A"
+                    }
+                    cleanWs()
+                }
+            }
+        }
         success {
             node('built-in') {
                 script {
-                    def s = getSafeState()
-                    notify("✅ Pipeline Passed", "Branch: ${s.branch}\nAuthor: ${s.author}")
+                    def branch = env.DETECTED_BRANCH ?: 'unknown'
+                    def author = env.GIT_AUTHOR     ?: 'unknown'
+                    def commit = env.SHORT_COMMIT    ?: 'unknown'
+                    echo """
+════════════════════════════════════
+  ✅ Pipeline Passed
+════════════════════════════════════
+Branch: ${branch}
+Author: ${author}
+Commit: ${commit}
+════════════════════════════════════
+"""
                 }
             }
         }
         failure {
             node('built-in') {
                 script {
-                    def s = getSafeState()
-                    notify("❌ Pipeline Failed", "Branch: ${s.branch}\nFailed at: ${env.STAGE_NAME}")
-                }
-            }
-        }
-        always {
-            node('built-in') {
-                script {
-                    // This must match the function name defined below
-                    logPipelineDuration() 
-                    // cleanWs()
+                    def branch = env.DETECTED_BRANCH ?: 'unknown'
+                    def author = env.GIT_AUTHOR      ?: 'unknown'
+                    def failed = env.FAILED_STAGE    ?: 'unknown'
+                    echo """
+════════════════════════════════════
+  ❌ Pipeline Failed
+════════════════════════════════════
+Branch: ${branch}
+Author: ${author}
+Failed Stage: ${failed}
+════════════════════════════════════
+"""
                 }
             }
         }
@@ -320,36 +345,4 @@ pipeline {
 
 
 
-// =======================
-// 🔧 SAFE HELPERS (FIXED)
-// =======================
-import groovy.json.JsonSlurper
 
-def getSafeState() {
-    def state = [branch: 'unknown', author: 'unknown', commit: 'unknown']
-    try {
-        unstash 'pipeline-state'
-        def jsonPath = "jenkins/state/pipeline-meta.json"
-        if (fileExists(jsonPath)) {
-            def json = new JsonSlurper().parseText(readFile(jsonPath))
-            state.branch = json.branch ?: state.branch
-            state.author = json.author ?: state.author
-            state.commit = json.commit ?: state.commit
-        }
-    } catch (e) { echo "⚠️ State fetch failed: ${e.message}" }
-    return state
-}
-
-def notify(String title, String message) {
-    echo "════════════════════════════════════\n  ${title}\n════════════════════════════════════\n${message?.trim()}\n════════════════════════════════════"
-}
-
-// MAKE SURE THIS NAME MATCHES YOUR POST BLOCK CALL
-def logPipelineDuration() {
-    try {
-        if (currentBuild.startTimeInMillis) {
-            def duration = ((System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000).toInteger()
-            echo "⏱️ Pipeline duration: ${duration}s"
-        }
-    } catch (e) { echo "⏱️ Duration: N/A" }
-}
