@@ -322,13 +322,13 @@ pipeline {
         }
 
         stage('Push') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                    branch 'feature/ci-cd'
-                }
-            }
+            // when {
+            //     anyOf {
+            //         branch 'main'
+            //         branch 'develop'
+            //         branch 'feature/ci-cd'
+            //     }
+            // }
             steps {
                 script {
                     try {
