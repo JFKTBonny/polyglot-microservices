@@ -15,6 +15,9 @@ if command -v checkov &>/dev/null; then
 fi
 
 echo "Installing Checkov..."
+python3 -m venv /tmp/venv/checkov
+cd /tmp/venv/checkov
+source ./bin/activate
 pip install checkov --quiet --break-system-packages 2>&1 | tail -5
 echo "Checkov installed: $(checkov --version)"
 '''
