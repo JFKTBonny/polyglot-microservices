@@ -236,6 +236,28 @@ pipeline {
                 }
             }
         }
+
+        stage('Infra Scan') {
+            steps {
+                script {
+                    try {
+                        def is = load 'jenkins/stages/infra-scan.groovy'
+                        is.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Infra Scan'
+                        throw err
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        notify('Infra Scan Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nInfrastructure scan failed")
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
