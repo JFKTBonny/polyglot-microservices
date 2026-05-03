@@ -23,7 +23,7 @@ def execute() {
     stage('Docker Login') {
         echo "Logging in to Docker Hub..."
         withCredentials([usernamePassword(
-            credentialsId: 'DOCKER_CREDS',
+            credentialsId: 'dockerhub',
             usernameVariable: 'DOCKER_USER',
             passwordVariable: 'DOCKER_PASS'
         )]) {
