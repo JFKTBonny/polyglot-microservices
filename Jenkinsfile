@@ -288,51 +288,41 @@ pipeline {
     // POST
     // =======================
     post {
-
-        success {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Passed',
-                        """Branch: ${s.branch}
-Author: ${s.author}
-Commit: ${s.commit}"""
-                    )
-                }
-            }
-        }
-
-        failure {
-            node('built-in') {
-                script {
-                    def s = safeState()
-
-                    notify(
-                        'Pipeline Failed',
-                        """Branch: ${s.branch}
-Failed Stage: ${env.FAILED_STAGE}
-Author: ${s.author}"""
-                    )
-                }
-            }
-        }
-
-        always {
-            node('built-in') {
-                script {
-                    def duration = env.PIPELINE_START_TIME
-                        ? ((System.currentTimeMillis() - env.PIPELINE_START_TIME.toLong()) / 1000).toInteger()
-                        : 0
-
-                    echo "Pipeline duration: ${duration}s"
-
-                    cleanWs()
-                }
+    success {
+        // Use 'built-in' only if the notification logic requires it
+        node('built-in') {
+            script {
+                // Use a safe getter to prevent script termination on nulls
+                def s = getSafeState()
+                notify("✅ Pipeline Passed", 
+                    "Branch: ${s.branch}\nAuthor: ${s.author}\nCommit: ${s.commit}")
             }
         }
     }
+
+    failure {
+        node('built-in') {
+            script {
+                def s = getSafeState()
+                // env.STAGE_NAME is a built-in Jenkins variable
+                def failedAt = env.STAGE_NAME ?: "Unknown Stage"
+                
+                notify("❌ Pipeline Failed", 
+                    "Branch: ${s.branch}\nFailed at: ${failedAt}\nAuthor: ${s.author}")
+            }
+        }
+    }
+
+    always {
+        // Always clean up to prevent disk space issues
+        node('built-in') {
+            script {
+                calculateAndLogDuration()
+                cleanWs(deleteDirs: true, disableDeferredWipeout: true)
+            }
+        }
+    }
+}
 }
 
 
@@ -343,16 +333,34 @@ Author: ${s.author}"""
 // 🔧 SAFE HELPERS (FIXED)
 // =======================
 
-def stateScript = load 'jenkins/helpers/state.groovy'
-    def state = stateScript.load()
+// Use a robust state fetcher
+def getSafeState() {
+    try {
+        // Attempt to load your custom state script
+        def stateScript = load 'jenkins/helpers/state.groovy'
+        def s = stateScript.load()
+        return [
+            branch: s.branch ?: 'N/A',
+            author: s.author ?: 'N/A',
+            commit: s.commit ?: 'N/A'
+        ]
+    } catch (Exception e) {
+        echo "Warning: Could not load state.groovy: ${e.message}"
+        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
+    }
+}
 
-    state.branch = state.branch ?: 'unknown'
-    state.author = state.author ?: 'unknown'
-    state.commit = state.commit ?: 'unknown'
-
-    echo "Branch: ${state.branch}"
-    echo "Author: ${state.author}"
-    echo "Commit: ${state.commit}"
+def calculateAndLogDuration() {
+    try {
+        if (currentBuild.startTimeInMillis) {
+            def durationMs = System.currentTimeMillis() - currentBuild.startTimeInMillis
+            def durationSec = (durationMs / 1000).toInteger()
+            echo "⏱️ Total Duration: ${durationSec}s"
+        }
+    } catch (e) {
+        echo "Could not calculate duration"
+    }
+}
 
 def notify(String title, String message) {
     
