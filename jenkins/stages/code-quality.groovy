@@ -108,7 +108,7 @@ fi
 
 # go vet
 echo "Running go vet..."
-go vet -C $SERVICE ./... 2>&1 | tee go-vet-report.txt || true
+go vet cd $SERVICE ./... 2>&1 | tee go-vet-report.txt || true
 
 # staticcheck
 if ! command -v staticcheck &>/dev/null; then
@@ -117,7 +117,7 @@ if ! command -v staticcheck &>/dev/null; then
 fi
 
 echo "Running staticcheck..."
-staticcheck -C $SERVICE ./... 2>&1 | tee go-staticcheck-report.txt || true
+staticcheck cd $SERVICE ./... 2>&1 | tee go-staticcheck-report.txt || true
 
 ISSUES=$(wc -l < go-staticcheck-report.txt 2>/dev/null || echo "0")
 echo "staticcheck issues: $ISSUES"
@@ -145,8 +145,7 @@ fi
 
 cd $SERVICE
 
-mvn com.puppycrawl.tools:checkstyle-maven-plugin:3.3.1:checkstyle \
-    -Dcheckstyle.config.location=google_checks.xml \
+mvn org.apache.maven.plugins:maven-checkstyle-plugin:3.3.1:checkstyle \
     -Dcheckstyle.failOnViolation=false \
     --no-transfer-progress \
     2>/dev/null || true
