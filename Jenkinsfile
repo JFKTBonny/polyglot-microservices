@@ -343,13 +343,16 @@ Author: ${s.author}"""
 // 🔧 SAFE HELPERS (FIXED)
 // =======================
 
-def safeState() {
-  return [
-    branch: env.BRANCH_NAME ?: 'unknown',
-    author: env.GIT_AUTHOR_NAME ?: 'unknown',
-    commit: env.GIT_COMMIT ?: 'unknown'
-  ]
-}
+def stateScript = load 'jenkins/helpers/state.groovy'
+    def state = stateScript.load()
+
+    state.branch = state.branch ?: 'unknown'
+    state.author = state.author ?: 'unknown'
+    state.commit = state.commit ?: 'unknown'
+
+    echo "Branch: ${state.branch}"
+    echo "Author: ${state.author}"
+    echo "Commit: ${state.commit}"
 
 def notify(String title, String message) {
     
