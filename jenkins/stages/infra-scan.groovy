@@ -57,7 +57,7 @@ mkdir -p checkov-reports
 echo "Scanning k8s/ directory..."
 
 checkov \
-    --directory k8s/ \
+    --directory feature/k8s/ \
     --framework kubernetes \
     --output json \
     --output-file-path checkov-reports/ \
@@ -66,7 +66,7 @@ checkov \
 
 # Also scan with compact summary to stdout
 checkov \
-    --directory k8s/ \
+    --directory feature/k8s/ \
     --framework kubernetes \
     --compact \
     --soft-fail \
@@ -159,7 +159,7 @@ FAIL=0
 WARN=0
 
 # Find all deployment/pod/statefulset manifests
-find k8s/ -name "*.yaml" -o -name "*.yml" | while read f; do
+find feature/k8s/ -name "*.yaml" -o -name "*.yml" | while read f; do
     # Only scan resource types kubesec supports
     if grep -qE "^kind: (Deployment|Pod|StatefulSet|DaemonSet|Job|CronJob)" "$f" 2>/dev/null; then
         BASENAME=$(basename "$f" .yaml)
