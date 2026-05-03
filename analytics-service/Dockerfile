@@ -24,7 +24,7 @@ RUN composer dump-autoload --optimize --no-dev --ignore-platform-reqs
 FROM php:8.4-cli-alpine
 WORKDIR /app
 
-RUN apk add --no-cache libpq-dev=16.8-r0 \
+RUN apk add --no-cache libpq-dev \
     && docker-php-ext-install pdo pdo_pgsql
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
