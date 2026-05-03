@@ -19,7 +19,8 @@ def execute() {
     def shortCommit = env.SHORT_COMMIT    ?: 'latest'
     def buildTag    = "${branch}-${shortCommit}".replaceAll('/', '-')
 
-    // ── 8.1 Install Trivy ─────────────────────────────────────
+
+    // #################### 8.1 Install Trivy ######################################################
     stage('Install Trivy') {
         writeFile file: 'install-trivy.sh', text: '''#!/bin/bash
 set -e
@@ -41,26 +42,29 @@ echo "Trivy installed: $(trivy --version | head -1)"
         sh 'bash install-trivy.sh && rm -f install-trivy.sh'
     }
 
-    // ── 8.2 Install Grype ─────────────────────────────────────
+
+    // #################### 8.2 Install Grype ######################################################
+    
     stage('Install Grype') {
         writeFile file: 'install-grype.sh', text: '''#!/bin/bash
 set -e
 
-if command -v grype &>/dev/null; then
-    echo "Grype already installed: $(grype version | head -1)"
+if /tmp/grype version &>/dev/null 2>&1; then
+    echo "Grype already installed: $(/tmp/grype version | head -1)"
     exit 0
 fi
 
 echo "Installing Grype..."
 curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
-    | sh -s -- -b /usr/local/bin
+    | sh -s -- -b /tmp
 
-echo "Grype installed: $(grype version | head -1)"
+echo "Grype installed: $(/tmp/grype version | head -1)"
 '''
         sh 'bash install-grype.sh && rm -f install-grype.sh'
     }
 
-    // ── 8.3 Scan with Trivy ───────────────────────────────────
+
+    // #################### 8.3 Scan with Trivy ######################################################
     stage('Trivy Scan') {
         echo "Running Trivy vulnerability scans..."
 
@@ -134,7 +138,8 @@ fi
         stash name: 'trivy-reports', includes: 'trivy-reports/**'
     }
 
-    // ── 8.4 Scan with Grype ───────────────────────────────────
+
+    // #################### 8.4 Scan with Grype ######################################################
     stage('Grype Scan') {
         echo "Running Grype vulnerability scans..."
 
@@ -151,7 +156,7 @@ REPORT="grype-reports/${svc}.json"
 
 echo "Scanning \$IMAGE with Grype..."
 
-grype "\$IMAGE" \\
+/tmp/grype "\$IMAGE" \\
     --output json \\
     --file "\$REPORT" \\
     --only-fixed \\
