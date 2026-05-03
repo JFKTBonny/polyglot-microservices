@@ -320,6 +320,27 @@ pipeline {
                 }
             }
         }
+
+        stage('Push') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    branch 'feature/ci-cd'
+                }
+            }
+            steps {
+                script {
+                    try {
+                        def push = load 'jenkins/stages/push.groovy'
+                        push.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Push'
+                        throw err
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
