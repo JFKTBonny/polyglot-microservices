@@ -309,7 +309,7 @@ pipeline {
                 script {
                     // This must match the function name defined below
                     logPipelineDuration() 
-                    cleanWs()
+                    // cleanWs()
                 }
             }
         }
