@@ -333,44 +333,64 @@ pipeline {
 // 🔧 SAFE HELPERS (FIXED)
 // =======================
 
-// Use a robust state fetcher
+import groovy.json.JsonSlurper
+
+/**
+ * Safely retrieves pipeline metadata by unstashing and parsing the state JSON.
+ * Designed to be called within a script block inside post-actions.
+ */
 def getSafeState() {
+    def state = [
+        branch: 'unknown',
+        author: 'unknown',
+        commit: 'unknown'
+    ]
+
     try {
-        // Attempt to load your custom state script
-        def stateScript = load 'jenkins/helpers/state.groovy'
-        def s = stateScript.load()
-        return [
-            branch: s.branch ?: 'N/A',
-            author: s.author ?: 'N/A',
-            commit: s.commit ?: 'N/A'
-        ]
+        // Unstash the file into the current node's workspace
+        unstash 'pipeline-state'
+        
+        def jsonPath = "jenkins/state/pipeline-meta.json"
+        if (fileExists(jsonPath)) {
+            def fileContent = readFile(jsonPath)
+            def json = new JsonSlurper().parseText(fileContent)
+            
+            state.branch = json.branch ?: state.branch
+            state.author = json.author ?: state.author
+            state.commit = json.commit ?: state.commit
+        }
     } catch (Exception e) {
-        echo "Warning: Could not load state.groovy: ${e.message}"
-        return [branch: 'unknown', author: 'unknown', commit: 'unknown']
+        // If Init stage failed or stash is missing, we log a warning but don't break the build
+        echo "⚠️ Helper: Could not retrieve pipeline-state stash. Using defaults. (${e.message})"
     }
+    
+    return state
 }
 
-def calculateAndLogDuration() {
+/**
+ * Formats and prints a consistent notification block to the console.
+ */
+def notify(String title, String message) {
+    echo """
+══════════════════════════════════════════════════════
+  ${title}
+══════════════════════════════════════════════════════
+${message?.trim()}
+══════════════════════════════════════════════════════
+"""
+}
+
+/**
+ * Calculates build duration using Jenkins built-in timing metadata.
+ */
+def logPipelineDuration() {
     try {
         if (currentBuild.startTimeInMillis) {
             def durationMs = System.currentTimeMillis() - currentBuild.startTimeInMillis
             def durationSec = (durationMs / 1000).toInteger()
-            echo "⏱️ Total Duration: ${durationSec}s"
+            echo "⏱️ Total Pipeline Duration: ${durationSec}s"
         }
     } catch (e) {
-        echo "Could not calculate duration"
+        echo "⏱️ Total Pipeline Duration: N/A"
     }
 }
-
-def notify(String title, String message) {
-    
-    echo """
-════════════════════════════════════
-  ${title}
-════════════════════════════════════
-${message?.trim()}
-════════════════════════════════════
-"""
-}
-
-
