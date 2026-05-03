@@ -3,7 +3,8 @@ def execute() {
 
     pipeline.banner('Stage 4 - SAST')
 
-    // ── 4.1 Bandit — Python SAST ──────────────────────────────
+
+    // ################# 4.1 Bandit — Python SAST ##################################################
     stage('Bandit') {
         echo "Running Bandit — Python services..."
 
@@ -70,7 +71,7 @@ exit $FAILED
         echo "Bandit passed"
     }
 
-    // ── 4.2 ESLint Security — Node.js ─────────────────────────
+    // ######################### 4.2 ESLint Security — Node.js #########################################################
     stage('ESLint Security') {
         echo "Running ESLint security — user-service..."
 
@@ -153,7 +154,8 @@ echo "ESLint security passed"
         echo "ESLint security passed"
     }
 
-    // ── 4.3 golangci-lint — Go ────────────────────────────────
+
+    // ######################### 4.3 golangci-lint — Go ############################################
     stage('golangci-lint') {
         echo "Running golangci-lint — inventory-service..."
 
@@ -206,7 +208,8 @@ echo "golangci-lint complete"
         echo "golangci-lint passed"
     }
 
-    // ── 4.4 SpotBugs — Java ───────────────────────────────────
+
+    // ####### 4.4 SpotBugs — Java #############################################
     stage('SpotBugs') {
         echo "Running SpotBugs — payment-service..."
 
@@ -220,7 +223,7 @@ fi
 
 cd $SERVICE
 
-mvn compile spotbugs:check \
+mvn com.github.spotbugs:spotbugs-maven-plugin:4.8.3.1:spotbugs \
     -Dspotbugs.effort=Max \
     -Dspotbugs.threshold=High \
     -Dspotbugs.xmlOutput=true \
@@ -237,7 +240,8 @@ echo "SpotBugs complete"
         echo "SpotBugs passed"
     }
 
-    // ── 4.5 PHPCS Security Audit — PHP ───────────────────────
+
+    // ######################### 4.5 PHPCS Security Audit — PHP #####################################
     stage('PHPCS Security') {
         echo "Running PHPCS security audit — analytics-service..."
 
@@ -283,8 +287,9 @@ echo "PHPCS security complete"
         pipeline.archiveReport('phpcs-security-report.json')
         echo "PHPCS security passed"
     }
+    
 
-    // ── 4.6 Semgrep — All languages ───────────────────────────
+    // ######################### 4.6 Semgrep — All languages #######################################
     stage('Semgrep') {
         echo "Running Semgrep — all services..."
 
