@@ -192,6 +192,28 @@ pipeline {
                 }
             }
         }
+
+        stage('Build') {
+            steps {
+                script {
+                    try {
+                        def b = load 'jenkins/stages/build.groovy'
+                        b.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Build'
+                        throw err
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        notify('Build Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nDocker build failed")
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
