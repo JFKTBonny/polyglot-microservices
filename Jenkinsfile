@@ -170,6 +170,28 @@ pipeline {
                 }
             }
         }
+
+        stage('Tests') {
+            steps {
+                script {
+                    try {
+                        def t = load 'jenkins/stages/tests.groovy'
+                        t.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Tests'
+                        throw err
+                    }
+                }
+            }
+            post {
+                failure {
+                    script {
+                        notify('Tests Failed',
+                            "Branch: ${env.DETECTED_BRANCH ?: 'unknown'}\nTest suite failed")
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
