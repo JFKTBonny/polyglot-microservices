@@ -19,20 +19,26 @@ cd $SERVICE
 npm install --prefer-offline 2>/dev/null || true
 npm audit --audit-level=high --json > ../npm-audit-report.json 2>/dev/null || true
 
-CRITICAL=$(cat ../npm-audit-report.json | python3 -c "
+CRITICAL=$(python3 -c "
 import json,sys
-d = json.load(sys.stdin)
-meta = d.get('metadata', {})
-vulns = meta.get('vulnerabilities', {})
-print(vulns.get('critical', 0))
+try:
+    d = json.load(open('../npm-audit-report.json'))
+    meta = d.get('metadata', {})
+    vulns = meta.get('vulnerabilities', {})
+    print(vulns.get('critical', 0))
+except:
+    print(0)
 " 2>/dev/null || echo "0")
 
-HIGH=$(cat ../npm-audit-report.json | python3 -c "
+HIGH=$(python3 -c "
 import json,sys
-d = json.load(sys.stdin)
-meta = d.get('metadata', {})
-vulns = meta.get('vulnerabilities', {})
-print(vulns.get('high', 0))
+try:
+    d = json.load(open('../npm-audit-report.json'))
+    meta = d.get('metadata', {})
+    vulns = meta.get('vulnerabilities', {})
+    print(vulns.get('high', 0))
+except:
+    print(0)
 " 2>/dev/null || echo "0")
 
 echo "Critical: $CRITICAL"
@@ -66,6 +72,8 @@ echo "npm audit passed"
 SERVICES="order-service auth-service notification-service"
 FAILED=0
 
+pip install pip-audit --quiet 2>/dev/null || true
+
 for SERVICE in $SERVICES; do
     if [ ! -f "$SERVICE/requirements.txt" ]; then
         echo "No requirements.txt in $SERVICE — skipping"
@@ -74,8 +82,6 @@ for SERVICE in $SERVICES; do
 
     echo "Auditing $SERVICE..."
 
-    pip install pip-audit --quiet 2>/dev/null || true
-
     pip-audit \
         -r $SERVICE/requirements.txt \
         --format json \
@@ -83,15 +89,17 @@ for SERVICE in $SERVICES; do
         2>/dev/null || true
 
     CRITICAL=$(python3 -c "
-import json, sys
+import json
 try:
     d = json.load(open('pip-audit-$SERVICE.json'))
     deps = d if isinstance(d, list) else d.get('dependencies', [])
     count = sum(
         1 for dep in deps
         for vuln in dep.get('vulns', [])
-        if any(s.get('type') == 'cvss' and float(s.get('score', 0)) >= 9.0
-               for s in vuln.get('aliases', []))
+        if any(
+            s.get('type') == 'cvss' and float(s.get('score', 0)) >= 9.0
+            for s in vuln.get('aliases', [])
+        )
     )
     print(count)
 except:
@@ -113,12 +121,6 @@ exit $FAILED
             returnStatus: true
         )
         sh 'rm -f pip-audit.sh'
-
-        sh '''
-            for f in pip-audit-*.json; do
-                [ -f "$f" ] && echo "Archiving $f" || true
-            done
-        '''
 
         if (fileExists('pip-audit-order-service.json'))        pipeline.archiveReport('pip-audit-order-service.json')
         if (fileExists('pip-audit-auth-service.json'))         pipeline.archiveReport('pip-audit-auth-service.json')
@@ -142,22 +144,19 @@ if [ ! -f "$SERVICE/go.mod" ]; then
     exit 0
 fi
 
-# Install govulncheck
 go install golang.org/x/vuln/cmd/govulncheck@latest 2>/dev/null || true
 export PATH=$PATH:$(go env GOPATH)/bin
 
-cd $SERVICE
+# Run from repo root pointing to service
+govulncheck ./$SERVICE/... 2>&1 | tee govuln-report.txt || true
 
-govulncheck ./... 2>&1 | tee ../govuln-report.txt || true
-
-if grep -q "Vulnerability #" ../govuln-report.txt; then
+if grep -q "Vulnerability #" govuln-report.txt; then
     echo "Vulnerabilities found — review report"
 else
     echo "govulncheck passed — no vulnerabilities"
 fi
 '''
-        sh 'bash govuln.sh'
-        sh 'rm -f govuln.sh'
+        sh 'bash govuln.sh && rm -f govuln.sh'
         pipeline.archiveReport('govuln-report.txt')
         echo "govulncheck passed"
     }
@@ -181,13 +180,13 @@ mvn org.owasp:dependency-check-maven:check \
     -DskipTestScope=true \
     -Dformat=JSON \
     -DoutputDirectory=../owasp-report \
+    -DnvdDatafeedUrl=off \
     --no-transfer-progress \
     2>/dev/null || true
 
 echo "OWASP check complete"
 '''
-        sh 'bash owasp-check.sh'
-        sh 'rm -f owasp-check.sh'
+        sh 'bash owasp-check.sh && rm -f owasp-check.sh'
 
         if (fileExists('owasp-report/dependency-check-report.json')) {
             pipeline.archiveReport('owasp-report/dependency-check-report.json')
@@ -213,7 +212,7 @@ composer audit --format=json 2>/dev/null \
     | tee ../composer-audit-report.json || true
 
 FOUND=$(python3 -c "
-import json, sys
+import json
 try:
     d = json.load(open('../composer-audit-report.json'))
     advisories = d.get('advisories', {})
@@ -230,8 +229,7 @@ fi
 
 echo "composer audit complete"
 '''
-        sh 'bash composer-audit.sh'
-        sh 'rm -f composer-audit.sh'
+        sh 'bash composer-audit.sh && rm -f composer-audit.sh'
         pipeline.archiveReport('composer-audit-report.json')
         echo "composer audit passed"
     }
