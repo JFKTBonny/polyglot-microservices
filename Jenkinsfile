@@ -341,6 +341,20 @@ pipeline {
                 }
             }
         }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    try {
+                        def deploy = load 'jenkins/stages/deploy.groovy'
+                        deploy.execute()
+                    } catch (err) {
+                        env.FAILED_STAGE = 'Deploy'
+                        throw err
+                    }
+                }
+            }
+        }
     }
     // =======================
     // POST
