@@ -71,7 +71,7 @@ if kubectl get deployment "\$DEPLOYMENT" -n "\$NAMESPACE" &>/dev/null; then
 else
     echo "Deployment \$DEPLOYMENT not found - applying manifests..."
     # Find and apply the manifest
-    MANIFEST=\$(find k8s/ -name "deployment.yaml" -path "*${name}*" 2>/dev/null | head -1)
+    MANIFEST=\$(find feature/k8s/ -name "*.yaml" -path "*${name}*" 2>/dev/null | head -1)
     if [ -n "\$MANIFEST" ]; then
         kubectl apply -f "\$MANIFEST" -n "\$NAMESPACE" 2>/dev/null || echo "WARNING: Could not apply \$MANIFEST"
         kubectl set image deployment/"\$DEPLOYMENT" \
