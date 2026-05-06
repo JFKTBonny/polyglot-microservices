@@ -135,6 +135,7 @@ def execute() {
 
     echo ""
     echo "════ Ingress ════"
+    kubectl get all -n ingress-nginx || echo "No ingress-nginx"
     kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
     """
         sh 'chmod +x status.sh && ./status.sh'
