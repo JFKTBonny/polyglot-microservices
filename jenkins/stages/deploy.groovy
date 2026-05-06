@@ -23,7 +23,7 @@ def execute() {
     stage('Verify Cluster') {
         steps {
             script {
-                def namespace = 'polyglot'
+                
 
                 sh """
                 set -e
@@ -57,7 +57,7 @@ def execute() {
     stage('Find and Deploy manifests') {
         steps {
             script {
-                def namespace = "polyglot"
+                
 
                 services.each { svc ->
                     def name  = svc.name
@@ -132,7 +132,7 @@ def execute() {
     stage('Wait for Rollout') {
         steps {
             script {
-                def namespace = "polyglot"
+                
                 def timeout   = 120
 
                 services.each { svc ->
@@ -163,7 +163,7 @@ def execute() {
     stage('Deployment Status') {
         steps {
             script {
-                def namespace = "polyglot"
+                
 
                 sh """
                 echo "════ Deployments ════"
