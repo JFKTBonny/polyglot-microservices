@@ -21,105 +21,87 @@ def execute() {
     ]
 
     stage('Verify Cluster') {
-        steps {
-            script {
-                
+        writeFile file: 'verify-cluster.sh', text: """#!/bin/bash
+    set -e
 
-                sh """
-                set -e
+    NAMESPACE="${namespace}"
 
-                echo "kubectl version:"
-                kubectl version --client
+    echo "kubectl version:"
+    kubectl version --client
 
-                echo ""
-                echo "Cluster info:"
-                kubectl cluster-info --request-timeout=10s || \\
-                    echo "WARNING: Cannot reach cluster"
+    echo ""
+    echo "Cluster info:"
+    kubectl cluster-info --request-timeout=10s || echo "WARNING: Cannot reach cluster"
 
-                echo ""
-                echo "Namespace check:"
-                kubectl get namespace ${namespace} >/dev/null 2>&1 || {
-                    echo "Creating namespace ${namespace}..."
-                    kubectl create namespace ${namespace} || \\
-                        echo "Namespace may already exist"
-                }
-
-                echo ""
-                echo "Nodes:"
-                kubectl get nodes || echo "WARNING: Cannot list nodes"
-                """
-            }
-        }
+    echo ""
+    echo "Namespace check:"
+    kubectl get namespace "\$NAMESPACE" >/dev/null 2>&1 || {
+        echo "Creating namespace \$NAMESPACE..."
+        kubectl create namespace "\$NAMESPACE" || echo "Namespace may already exist"
     }
-        sh 'bash verify-cluster.sh && rm -f verify-cluster.sh'
+
+    echo ""
+    echo "Nodes:"
+    kubectl get nodes || echo "WARNING: Cannot list nodes"
+    """
+        sh 'chmod +x verify-cluster.sh && ./verify-cluster.sh'
     }
+
+
     // ############## Find and Deploy manifests ####################################################
     stage('Find and Deploy manifests') {
-        steps {
-            script {
-                
 
-                services.each { svc ->
-                    def name  = svc.name
-                    def image = svc.image
+    def serviceNames = services.collect { it.name }.join(' ')
+    def serviceImages = services.collect { "${it.name}=${it.image}" }.join(' ')
 
-                    sh """
-                    #!/bin/bash
-                    set -e
+        writeFile file: 'deploy.sh', text: """#!/bin/bash
+    set -e
 
-                    NAMESPACE="${namespace}"
-                    DEPLOYMENT="${name}"
-                    IMAGE="${image}"
+    NAMESPACE="${namespace}"
 
-                    echo "Processing \$DEPLOYMENT..."
+    declare -A IMAGES
+    for pair in ${serviceImages}; do
+        key=\${pair%%=*}
+        value=\${pair#*=}
+        IMAGES[\$key]=\$value
+    done
 
-                    # Ensure namespace exists
-                    kubectl get namespace "\$NAMESPACE" >/dev/null 2>&1 || \\
-                        kubectl create namespace "\$NAMESPACE"
+    SERVICES="${serviceNames}"
 
-                    # Apply shared resources
-                    echo "Applying configmaps..."
-                    find feature/k8s/configmaps/ -name "*.yaml" 2>/dev/null | \\
-                        xargs -r kubectl apply -n "\$NAMESPACE" -f || true
+    for SVC in \$SERVICES; do
+        IMAGE=\${IMAGES[\$SVC]}
 
-                    echo "Applying secrets..."
-                    find feature/k8s/secrets/ -name "*.yaml" 2>/dev/null | \\
-                        xargs -r kubectl apply -n "\$NAMESPACE" -f || true
+        echo "Processing \$SVC..."
 
-                    # Find manifest for this service
-                    MANIFEST=\$(find feature/k8s/ -name "*.yaml" -path "*${name}*" 2>/dev/null | head -1)
+        kubectl get namespace "\$NAMESPACE" >/dev/null 2>&1 || \\
+            kubectl create namespace "\$NAMESPACE"
 
-                    if [ -z "\$MANIFEST" ]; then
-                        echo "No manifest found for \$DEPLOYMENT ⚠️"
-                        exit 0
-                    fi
+        echo "Applying configmaps..."
+        find feature/k8s/configmaps/ -name "*.yaml" | \\
+            xargs -r kubectl apply -n "\$NAMESPACE" -f || true
 
-                    # Apply manifest
-                    echo "Applying \$MANIFEST..."
-                    kubectl apply -f "\$MANIFEST" -n "\$NAMESPACE"
+        echo "Applying secrets..."
+        find feature/k8s/secrets/ -name "*.yaml" | \\
+            xargs -r kubectl apply -n "\$NAMESPACE" -f || true
 
-                    # Update image (only if deployment exists)
-                    if kubectl get deployment "\$DEPLOYMENT" -n "\$NAMESPACE" >/dev/null 2>&1; then
-                        kubectl set image deployment/"\$DEPLOYMENT" \\
-                            "\$DEPLOYMENT"="\$IMAGE" \\
-                            -n "\$NAMESPACE"
-                    fi
+        MANIFEST=\$(find feature/k8s/ -name "*.yaml" -path "*\$SVC*" | head -1)
 
-                    echo "Done \$DEPLOYMENT ✅"
-                    """
-                }
+        if [ -z "\$MANIFEST" ]; then
+            echo "No manifest found for \$SVC ⚠️"
+            continue
+        fi
 
-                sh """
-                echo "Current deployments:"
-                kubectl get deployments -n ${namespace} || true
+        kubectl apply -f "\$MANIFEST" -n "\$NAMESPACE"
 
-                echo "Current pods:"
-                kubectl get pods -n ${namespace} || true
-                """
-            }
-        }
+        if kubectl get deployment "\$SVC" -n "\$NAMESPACE" >/dev/null 2>&1; then
+            kubectl set image deployment/"\$SVC" "\$SVC"="\$IMAGE" -n "\$NAMESPACE"
+        fi
+
+        echo "Done \$SVC ✅"
+    done
+    """
+        sh 'chmod +x deploy.sh && ./deploy.sh'
     }
-
        
 
      
@@ -130,60 +112,55 @@ def execute() {
 
 
     stage('Wait for Rollout') {
-        steps {
-            script {
-                
-                def timeout   = 120
 
-                services.each { svc ->
-                    def name = svc.name
+    def serviceNames = services.collect { it.name }.join(' ')
+    def timeout = 120
 
-                    sh """
-                    NAMESPACE="${namespace}"
-                    SVC="${name}"
-                    TIMEOUT=${timeout}
+        writeFile file: 'rollout.sh', text: """#!/bin/bash
 
-                    if kubectl get deployment "\$SVC" -n "\$NAMESPACE" >/dev/null 2>&1; then
-                        echo "Waiting for \$SVC..."
-                        kubectl rollout status deployment/"\$SVC" \\
-                            -n "\$NAMESPACE" \\
-                            --timeout="\${TIMEOUT}s" || \\
-                            echo "WARNING: \$SVC rollout failed or timed out"
-                    else
-                        echo "\$SVC not found - skipping"
-                    fi
-                    """
-                }
+    NAMESPACE="${namespace}"
+    TIMEOUT=${timeout}
+    SERVICES="${serviceNames}"
 
-                echo "Rollout wait complete"
-            }
-        }
+    for SVC in \$SERVICES; do
+        if kubectl get deployment "\$SVC" -n "\$NAMESPACE" >/dev/null 2>&1; then
+            echo "Waiting for \$SVC..."
+            kubectl rollout status deployment/"\$SVC" \\
+                -n "\$NAMESPACE" \\
+                --timeout="\${TIMEOUT}s" || \\
+                echo "WARNING: \$SVC rollout failed"
+        else
+            echo "\$SVC not found - skipping"
+        fi
+    done
+    """
+        sh 'chmod +x rollout.sh && ./rollout.sh'
     }
 
     stage('Deployment Status') {
-        steps {
-            script {
-                
 
-                sh """
-                echo "════ Deployments ════"
-                kubectl get deployments -n ${namespace} -o wide || echo "No deployments"
+        writeFile file: 'status.sh', text: """#!/bin/bash
 
-                echo ""
-                echo "════ Pods ════"
-                kubectl get pods -n ${namespace} -o wide || echo "No pods"
+    NAMESPACE="${namespace}"
 
-                echo ""
-                echo "════ Services ════"
-                kubectl get services -n ${namespace} || echo "No services"
+    echo "════ Deployments ════"
+    kubectl get deployments -n "\$NAMESPACE" -o wide || echo "No deployments"
 
-                echo ""
-            echo "════ Ingress ════"
-            kubectl get ingress -n ${namespace} || echo "No ingress"
-            """
-        }
+    echo ""
+    echo "════ Pods ════"
+    kubectl get pods -n "\$NAMESPACE" -o wide || echo "No pods"
+
+    echo ""
+    echo "════ Services ════"
+    kubectl get services -n "\$NAMESPACE" || echo "No services"
+
+    echo ""
+    echo "════ Ingress ════"
+    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
+    """
+        sh 'chmod +x status.sh && ./status.sh'
     }
-}
 
-echo "Stage 13 complete - deployment done"
+    echo "Stage 13 complete - deployment done"
+}    
 return this
