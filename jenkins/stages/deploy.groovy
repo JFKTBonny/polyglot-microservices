@@ -78,7 +78,7 @@ def execute() {
 
         echo "Applying configmaps..."
         find feature/k8s/configmaps/ -name "*.yaml" | \\
-            xargs -r kubectl apply -n "\$NAMESPACE" -f || true
+            xargs -r kubectl apply -n "\$NAMESPACE" -f --validate=false || true
 
         echo "Applying secrets..."
         find feature/k8s/secrets/ -name "*.yaml" | \\
@@ -111,7 +111,37 @@ def execute() {
 
 
 
-    stage('Wait for Rollout') {
+   
+
+    stage('Deployment Status') {
+
+        writeFile file: 'status.sh', text: """#!/bin/bash
+
+    NAMESPACE="${namespace}"
+
+    echo "════ Deployments ════"
+    sleep 30
+    kubectl get deployments -n "\$NAMESPACE" -o wide || echo "No deployments"
+
+    echo ""
+    echo "════ Pods ════"
+    kubectl get pods -n "\$NAMESPACE" -o wide || echo "No pods"
+
+    echo ""
+    echo "════ Services ════"
+    kubectl get services -n "\$NAMESPACE" || echo "No services"
+
+    echo ""
+    echo "════ Ingress ════"
+    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
+    """
+        sh 'chmod +x status.sh && ./status.sh'
+
+    }
+
+
+
+     stage('Wait for Rollout') {
 
     def serviceNames = services.collect { it.name }.join(' ')
     def timeout = 120
@@ -135,30 +165,6 @@ def execute() {
     done
     """
         sh 'chmod +x rollout.sh && ./rollout.sh'
-    }
-
-    stage('Deployment Status') {
-
-        writeFile file: 'status.sh', text: """#!/bin/bash
-
-    NAMESPACE="${namespace}"
-
-    echo "════ Deployments ════"
-    kubectl get deployments -n "\$NAMESPACE" -o wide || echo "No deployments"
-
-    echo ""
-    echo "════ Pods ════"
-    kubectl get pods -n "\$NAMESPACE" -o wide || echo "No pods"
-
-    echo ""
-    echo "════ Services ════"
-    kubectl get services -n "\$NAMESPACE" || echo "No services"
-
-    echo ""
-    echo "════ Ingress ════"
-    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
-    """
-        sh 'chmod +x status.sh && ./status.sh'
     }
 
     echo "Stage 13 complete - deployment done"
