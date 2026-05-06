@@ -43,6 +43,7 @@ def execute() {
     echo ""
     echo "Nodes:"
     kubectl get nodes || echo "WARNING: Cannot list nodes"
+    minikube addons enable ingress || echo "WARNING: Cannot enable ingress addon"
     """
         sh 'chmod +x verify-cluster.sh && ./verify-cluster.sh'
     }
@@ -93,9 +94,9 @@ def execute() {
 
         kubectl apply -f "\$MANIFEST" -n "\$NAMESPACE"
 
-        if kubectl get deployment "\$SVC" -n "\$NAMESPACE" >/dev/null 2>&1; then
-            kubectl set image deployment/"\$SVC" "\$SVC"="\$IMAGE" -n "\$NAMESPACE"
-        fi
+        kubectl get deployment "\$SVC" -n "\$NAMESPACE" 
+            
+        
 
         echo "Done \$SVC ✅"
     done
@@ -121,6 +122,7 @@ def execute() {
 
     echo "════ Deployments ════"
     sleep 30
+    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
     kubectl get deployments -n "\$NAMESPACE" -o wide || echo "No deployments"
 
     echo ""
