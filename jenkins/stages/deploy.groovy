@@ -78,12 +78,12 @@ def execute() {
             kubectl create namespace "\$NAMESPACE"
 
         echo "Applying configmaps..."
-        find feature/k8s/configmaps/ -name "*.yaml" | \\
-            xargs -r kubectl apply -n "\$NAMESPACE" -f --validate=false || true
+        
+        kubectl apply -f feature/k8s/configmaps/ -n "\$NAMESPACE"  --validate=false || true
 
         echo "Applying secrets..."
-        find feature/k8s/secrets/ -name "*.yaml" | \\
-            xargs -r kubectl apply -n "\$NAMESPACE" -f || true
+        
+        kubectl apply -f feature/k8s/secrets/ -n "\$NAMESPACE"  || true
 
         MANIFEST=\$(find feature/k8s/ -name "*.yaml" -path "*\$SVC*" | head -1)
 
