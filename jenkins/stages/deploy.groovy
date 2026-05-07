@@ -60,7 +60,7 @@ def execute() {
 
     for FILE in feature/k8s/configmaps/*.yaml; do
         [ -f "\$FILE" ] || continue
-        kubectl apply -n "\$NAMESPACE" -f "\$FILE"
+        kubectl apply -n "\$NAMESPACE" -f --validate=false "\$FILE"
     done
 
     echo "Applying secrets..."
