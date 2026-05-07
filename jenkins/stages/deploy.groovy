@@ -7,6 +7,7 @@ def execute() {
     def shortCommit = env.SHORT_COMMIT    ?: 'latest'
     def buildTag    = "${branch}-${shortCommit}".replaceAll('/', '-')
     def namespace   = 'polyglot'
+    def DEPLOY_PATH = 'feature/k8s'
 
     def services = [
         [name: 'user-service',        image: 'santonix/user-service'],
@@ -43,7 +44,7 @@ def execute() {
     set -e
 
     NAMESPACE="${namespace}"
-    DEPLOY_PATH="feature/k8s"
+   
 
     SERVICES=(
     "user-service"
