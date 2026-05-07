@@ -118,7 +118,7 @@ def execute() {
     echo "Checking final status..."
     echo "════ Deployments ════"
 
-    sleep 30
+    sleep 60
 
     kubectl get deployments -n "\$NAMESPACE"
 
