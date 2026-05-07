@@ -43,6 +43,7 @@ def execute() {
     set -e
 
     NAMESPACE="${namespace}"
+    DEPLOY_PATH="feature/k8s"
 
     SERVICES=(
     "user-service"
@@ -58,31 +59,21 @@ def execute() {
 
     echo "Applying configmaps..."
 
-    for FILE in feature/k8s/configmaps/*.yaml; do
-        [ -f "\$FILE" ] || continue
-        kubectl apply -f "\$FILE" -n "\$NAMESPACE"  --validate=false 
-    done
+    
+    kubectl apply -f "$DEPLOY_PATH/configmaps/*.yaml" -n "\$NAMESPACE"  --validate=false 
+    
 
     echo "Applying secrets..."
 
-    for FILE in feature/k8s/secrets/*.yaml; do
-        [ -f "\$FILE" ] || continue
-        kubectl apply -f "\$FILE" -n "\$NAMESPACE"  
-    done
+    
+    kubectl apply -f "$DEPLOY_PATH/secrets/*.yaml" -n "\$NAMESPACE"  
+    
 
     echo "Deploying services..."
 
     for SVC in "\${SERVICES[@]}"; do
 
-        if [ ! -d "feature/k8s/\$SVC" ]; then
-            echo "No manifests for \$SVC"
-            continue
-        fi
-
-        echo "Deploying \$SVC..."
-
-        find feature/k8s/\$SVC -name "*.yaml" \\
-            -exec kubectl apply -n "\$NAMESPACE" -f {} \\;
+        kubectl apply -f "$DEPLOY_PATH/\$SVC" --validate=false -n "\$NAMESPACE"
 
     done
     """
