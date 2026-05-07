@@ -68,7 +68,10 @@ def execute() {
     echo "Applying secrets..."
 
     
-    kubectl apply -f "$DEPLOY_PATH/secrets/" -n "\$NAMESPACE"  
+    kubectl apply -f "$DEPLOY_PATH/secrets/" -n "\$NAMESPACE" 
+
+    echo "Applying databases..." 
+    kubectl apply -f "$DEPLOY_PATH/databases/" -n "\$NAMESPACE"  
     
 
     echo "Deploying services..."
