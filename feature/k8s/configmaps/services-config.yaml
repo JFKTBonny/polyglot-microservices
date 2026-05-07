@@ -31,7 +31,7 @@ data:
   NODE_ENV:  "production"
   APP_ENV:   "production"
   GIN_MODE:  "release"
-  PYTHONUNBUFFERED: 1 
+  PYTHONUNBUFFERED: "1" 
 
 # JWT Settings
 JWT_ALGORITHM: "HS256"
