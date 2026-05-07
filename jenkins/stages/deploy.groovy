@@ -75,7 +75,7 @@ def execute() {
 
     for SVC in "\${SERVICES[@]}"; do
 
-        kubectl apply -f "$DEPLOY_PATH/\$SVC" --validate=false -n "\$NAMESPACE"
+        kubectl apply -f "$DEPLOY_PATH/\$SVC"  -n "\$NAMESPACE"
 
     done
     """
@@ -112,8 +112,11 @@ def execute() {
 
     done
 
-    echo ""
+    echo "Checking final status..."
     echo "════ Deployments ════"
+
+    sleep 30
+
     kubectl get deployments -n "\$NAMESPACE"
 
     echo ""
