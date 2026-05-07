@@ -56,6 +56,7 @@ def execute() {
     "notification-service"
     "api-gateway"
     "ui-service"
+    "kafka"
     )
 
     echo "Applying configmaps..."
