@@ -61,13 +61,13 @@ def execute() {
     echo "Applying configmaps..."
 
     
-    kubectl apply -f "$DEPLOY_PATH/configmaps/*.yaml" -n "\$NAMESPACE"  --validate=false 
+    kubectl apply -f "$DEPLOY_PATH/configmaps/" -n "\$NAMESPACE"  --validate=false 
     
 
     echo "Applying secrets..."
 
     
-    kubectl apply -f "$DEPLOY_PATH/secrets/*.yaml" -n "\$NAMESPACE"  
+    kubectl apply -f "$DEPLOY_PATH/secrets/" -n "\$NAMESPACE"  
     
 
     echo "Deploying services..."
