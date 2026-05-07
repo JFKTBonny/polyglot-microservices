@@ -1,0 +1,157 @@
+                                                            #################################
+                                                            ###   Architecture Overview  ####
+                                                            #################################
+
+        Browser
+        └── Nginx (API Gateway) :80
+                ├── /api/users      → User Service      :3001
+                ├── /api/orders     → Order Service      :3002
+                ├── /api/products   → Inventory Service  :3003
+                ├── /api/payments   → Payment Service    :3004
+                ├── /api/analytics  → Analytics Service  :3005
+                └── /               → UI Service         :3000
+
+Service Roles
+#############
+
+API Gateway — Nginx
+*******************
+        The single entry point for all traffic. 
+        No client ever talks directly to a backend service. 
+        It handles routing, rate limiting (100 req/min per IP), correlation ID injection, and request logging. 
+        When the UI calls /api/orders, Nginx decides which service receives it and forwards the request with the client's real IP and a unique correlation ID.
+
+User Service — Node.js + Express + PostgreSQL
+************
+Owns user accounts exclusively. 
+Creates, reads, updates and deletes users. 
+Its PostgreSQL database is never touched by any other service. 
+When Order Service needs to verify a user exists, it calls GET /users/:id over HTTP — never queries the database directly. 
+This is the boundary that makes User Service truly independent.
+
+Order Service — Python + FastAPI + MySQL
+*************
+Orchestrates the order creation flow. 
+When a client places an order it does three things in sequence:
+         - validates the user exists by calling User Service synchronously
+         - saves the order to its own MySQL database
+         - then publishes an order,create event to Kafka and returns immediately. 
+It never waits for payment or stock — those happen asynchronously.
+
+Inventory Service — Go + Gin + MariaDB
+*****************
+Manages product stock levels. 
+It runs two roles simultaneously in the same process:
+            - an HTTP server exposing product and stock endpoints
+            - and a Kafka consumer listening for order.created events. 
+When it receives an event it checks if stock is available for every item. 
+If yes it reserves the stock and publishes stock.reserved. 
+If no it publishes stock.insufficient. 
+It owns the only source of truth for inventory.
+
+Payment Service — Java + Spring Boot + PostgreSQL
+***************
+Processes payments. 
+It listens for stock.reserved events from Kafka — only charges the customer after stock is confirmed available. 
+Simulates a payment gateway with 90% success rate. 
+On success publishes payment.processed. 
+On failure publishes payment.failed. 
+Every payment is saved to its own PostgreSQL database with full audit trail.
+
+Notification Service — Python + aiokafka
+********************
+Has no HTTP interface at all — invisible to the outside world. 
+Runs as a pure Kafka consumer listening on order.created. 
+When an order is created it sends a confirmation email (simulated as a log message). 
+It doesn't care about payment outcome — its job is to acknowledge the order immediately. 
+Decoupled completely from the rest of the system.
+
+Analytics Service — PHP + Laravel + PostgreSQL
+*****************
+Also runs two roles:
+     - an HTTP server exposing analytics endpoints
+     - and a Kafka consumer listening on all topics (order.created, payment.processed, payment.failed, stock.reserved, stock.insufficient). 
+Every event is stored as a raw record in the analytics database and daily metrics are updated atomically. 
+Provides aggregated data: """ total revenue, order counts, payment success rates, top products """ .
+
+UI Service — HTML5 + CSS + JS + Nginx
+**********
+A static web dashboard served by Nginx. 
+Makes API calls exclusively through the gateway — never directly to backend services. 
+Shows real-time analytics, inventory levels, order history, payment status. 
+Can create users, place orders, and update stock through the same API the gateway exposes.
+
+                                        ######################################
+                                        Complete Request Flow — Place an Order
+                                        ######################################
+
+1. Browser → POST /api/orders (Gateway)
+      ↓
+2. Nginx routes to Order Service
+      ↓
+3. Order Service → GET /users/:id (User Service) — sync HTTP
+      ↓ user exists
+4. Order Service → saves order to MySQL (status: pending)
+      ↓
+5. Order Service → publishes order.created to Kafka
+      ↓ returns order to browser immediately
+      ↓
+6. Kafka distributes event to 3 consumers simultaneously:
+      ├── Inventory Service
+      │     → checks stock availability
+      │     → reserves stock in MariaDB
+      │     → publishes stock.reserved
+      │           ↓
+      │     Payment Service
+      │           → simulates payment gateway
+      │           → saves payment to PostgreSQL
+      │           → publishes payment.processed or payment.failed
+      │
+      ├── Notification Service
+      │     → logs "email sent to user"
+      │
+      └── Analytics Service
+            → stores order.created event
+            → updates daily_metrics table
+            → later consumes stock.reserved, payment.processed
+            → updates revenue and payment counts
+
+Data Ownership
+**************
+Service              Database      Tables owned
+─────────────────────────────────────────────────
+User Service         PostgreSQL    users
+Order Service        MySQL         orders
+Inventory Service    MariaDB       products
+Payment Service      PostgreSQL    payments
+Analytics Service    PostgreSQL    analytics_events, daily_metrics
+
+No service reads another service's database directly. 
+Data crosses service boundaries only through HTTP calls or Kafka events. 
+This is the fundamental rule that makes each service independently deployable, scalable, and replaceable.
+
+Communication Patterns
+######################
+Synchronous (HTTP)
+******************
+  Order Service → User Service       validate user exists before order
+  UI → Gateway → any service         user-initiated requests
+
+Asynchronous (Kafka)
+********************
+  Order Service → order.created          notify system an order was placed
+  Inventory Service → stock.reserved     notify payment to proceed
+  Inventory Service → stock.insufficient notify payment to skip
+  Payment Service → payment.processed    notify system payment succeeded
+  Payment Service → payment.failed       notify system payment failed
+  All services → Analytics Service       feed metrics pipeline
+
+Why This Architecture
+*********************
+Each service can be:
+
+        - Deployed independently — update Payment Service without touching Order Service
+        - Scaled independently — 10 Inventory Service instances if stock checks are slow
+        - Written in any language — proven here with 5 different stacks
+        - Failed independently — Notification Service crashing doesn't affect order creation
+        - Owned by separate teams — each team owns their service end to end

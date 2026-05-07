@@ -1,0 +1,12 @@
+title = "Gitleaks config"
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''Test_tls-ingress/''',
+    '''test_Auth_functionality''',
+    '''\.example$''',
+    '''\.sample$''',
+    '''gitleaks-report\.json''',
+    '''\.gitleaks\.toml'''
+  ]

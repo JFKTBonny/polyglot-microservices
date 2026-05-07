@@ -1,0 +1,50 @@
+# Register fresh user
+curl -s -X POST http://192.168.49.2/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Alice",
+    "email": "alice@example.com",
+    "password": "Secret123",
+    "role": "user"
+  }' | jq
+
+# Get fresh token
+TOKEN=$(curl -s -X POST http://192.168.49.2/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"Secret123"}' | jq -r '.access_token')
+
+echo "Token: $TOKEN"
+
+# Test routes
+curl -s http://192.168.49.2/api/users \
+  -H "Authorization: Bearer $TOKEN" | jq .data
+
+curl -s http://192.168.49.2/api/products \
+  -H "Authorization: Bearer $TOKEN" | jq .count
+
+# Create user profile
+USER=$(curl -s -X POST http://192.168.49.2/api/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"name":"Alice","email":"alice@example.com"}' | jq -r '.id')
+
+echo "User: $USER"
+
+# Create order
+curl -s -X POST http://192.168.49.2/api/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d "{
+    \"user_id\": \"$USER\",
+    \"items\": [{\"product_id\":\"SKU-001\",\"name\":\"Laptop\",\"quantity\":1,\"price\":999.99}]
+  }" | jq
+
+# Wait for Kafka saga
+sleep 15
+
+# Check results
+curl -s http://192.168.49.2/api/payments \
+  -H "Authorization: Bearer $TOKEN" | jq
+
+curl -s http://192.168.49.2/api/analytics/summary \
+  -H "Authorization: Bearer $TOKEN" | jq

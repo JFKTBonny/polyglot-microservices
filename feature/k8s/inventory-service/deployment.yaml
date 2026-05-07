@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: polyglot
+  labels:
+    app: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      initContainers:
+        - name: migrate
+          image: mariadb:11.2
+          env:
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              until mariadb -h mariadb-inventory -P 3306 -u appuser inventorydb -e "SELECT 1" > /dev/null 2>&1; do
+                echo "waiting for mariadb-inventory..."
+                sleep 3
+              done
+              mariadb -h mariadb-inventory -P 3306 -u appuser inventorydb -e "
+                CREATE TABLE IF NOT EXISTS products (
+                  id                VARCHAR(36)   NOT NULL DEFAULT (UUID()),
+                  sku               VARCHAR(50)   NOT NULL UNIQUE,
+                  name              VARCHAR(255)  NOT NULL,
+                  price             DECIMAL(10,2) NOT NULL,
+                  stock_quantity    INT           NOT NULL DEFAULT 0,
+                  reserved_quantity INT           NOT NULL DEFAULT 0,
+                  updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id)
+                );
+                INSERT IGNORE INTO products (sku, name, price, stock_quantity) VALUES
+                  ('SKU-001', 'Laptop',     999.99, 50),
+                  ('SKU-002', 'Mouse',       29.99, 200),
+                  ('SKU-003', 'Keyboard',    79.99, 150),
+                  ('SKU-004', 'Monitor',    349.99, 30),
+                  ('SKU-005', 'Headphones',  99.99, 75);
+              "
+              echo "migrations complete."
+      containers:
+        - name: inventory-service
+          image: santonix/inventory-service:v1.0.0
+          ports:
+            - containerPort: 3003
+          env:
+            - name: PORT
+              value: "3003"
+            - name: DB_HOST
+              value: "mariadb-inventory"
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: DB_PORT_MYSQL
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_NAME_INVENTORY
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+            - name: GIN_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: GIN_MODE
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: polyglot
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - port: 3003
+      targetPort: 3003

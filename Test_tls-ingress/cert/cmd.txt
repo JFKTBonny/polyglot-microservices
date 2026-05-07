@@ -1,0 +1,15 @@
+# Generate a self-signed certificate[...Other Certs can be used: Letsencrypt cert(non profit  trusted certificate authority and free)]
+************************************************************************************************************************************
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout server.key -out server.crt -config openssl.cnf
+
+# Verify the certificate:
+*************************
+        openssl x509 -in server.crt -text -noout
+
+# Create the secret tls for app ingress:
+****************************************
+        kubectl create secret tls hello-app-tls \
+            --namespace dev \
+            --key server.key \
+            --cert server.crt

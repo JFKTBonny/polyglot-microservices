@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: polyglot
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      initContainers:
+        - name: migrate
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-payments -U appuser -d paymentdb; do
+                echo "waiting for postgres-payments..."
+                sleep 2
+              done
+              psql -h postgres-payments -U appuser -d paymentdb -c "
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
+                CREATE TABLE IF NOT EXISTS payments (
+                  id             UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+                  order_id       UUID          NOT NULL,
+                  user_id        UUID          NOT NULL,
+                  amount         DECIMAL(10,2) NOT NULL,
+                  status         VARCHAR(50)   NOT NULL DEFAULT 'pending',
+                  payment_method VARCHAR(50)   NOT NULL DEFAULT 'card',
+                  failure_reason TEXT,
+                  created_at     TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                  updated_at     TIMESTAMPTZ   NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+                CREATE INDEX IF NOT EXISTS idx_payments_user_id  ON payments(user_id);
+                CREATE INDEX IF NOT EXISTS idx_payments_status   ON payments(status);
+              "
+              echo "migrations complete."
+      containers:
+        - name: payment-service
+          image: santonix/payment-service:v1.0.0
+          ports:
+            - containerPort: 3004
+          env:
+            - name: SERVER_PORT
+              value: "3004"
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-payments:5432/paymentdb"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: services-secrets
+                  key: DB_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:29092"
+            - name: ORDER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: services-config
+                  key: ORDER_SERVICE_URL
+          readinessProbe:
+            httpGet:
+              path: /payments/health
+              port: 3004
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /payments/health
+              port: 3004
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: polyglot
+spec:
+  selector:
+    app: payment-service
+  ports:
+    - port: 3004
+      targetPort: 3004

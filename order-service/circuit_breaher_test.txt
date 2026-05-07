@@ -1,0 +1,85 @@
+Cricuit breaker
+***************
+          Circuit breaker protect Order service from cascading failures when User service is slow or down...
+## Without circuit breaker
+**************************  
+           Order Service → User Service (if down, Order Service hangs for 3s then fails)
+                            (under load, 100 requests × 3s timeout = system overload)    
+
+## with circuit breaker
+***********************
+            Order Service → Circuit Breaker → User Service
+                    │
+                    ├── CLOSED  → calls pass through normally
+                    ├── OPEN    → calls fail immediately (no timeout wait)
+                    └── HALF-OPEN → one test call, if success → CLOSED    
+
+## States
+*********
+        CLOSED    → normal operation, calls pass through
+                    opens after 5 consecutive failures
+
+        OPEN      → fast fail, no calls made
+                    stays open for 30 seconds
+
+        HALF-OPEN → after 30s, lets one test call through
+                    success → CLOSED
+                    failure → OPEN again                       
+
+########################################################################################################################
+Tests steps:
+***********                                                 
+
+docker compose up --build order-service -d
+
+# Check health — shows circuit breaker state
+curl -s http://localhost:3002/health | jq
+
+# Normal order — circuit CLOSED
+TOKEN=$(curl -s -X POST http://localhost/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","password":"Secret123"}' | jq -r '.access_token')
+
+curl -s -X POST http://localhost/api/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "user_id": "924e3133-58e2-4062-98c1-81e7b172a5c8",
+    "items": [{"product_id":"SKU-001","name":"Laptop","quantity":1,"price":999.99}]
+  }' | jq
+
+# Stop User Service — simulate failure
+docker compose stop user-service
+
+# Fire 6 requests — watch circuit open after 5 failures
+for i in {1..6}; do
+  echo "Request $i:"
+  curl -s -X POST http://localhost/api/orders \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TOKEN" \
+    -d '{
+      "user_id": "924e3133-58e2-4062-98c1-81e7b172a5c8",
+      "items": [{"product_id":"SKU-001","name":"Laptop","quantity":1,"price":999.99}]
+    }' | jq .user_id
+done
+
+# Check circuit state — should be OPEN
+curl -s http://localhost:3002/health | jq .circuit_breakers
+
+# Restart User Service — circuit should recover after 30s
+docker compose start user-service
+
+# Wait for recovery
+sleep 35
+
+# Check state — should be CLOSED again
+curl -s http://localhost:3002/health | jq .circuit_breakers
+
+# Place a normal order — should work without fallback
+curl -s -X POST http://localhost/api/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "user_id": "924e3133-58e2-4062-98c1-81e7b172a5c8",
+    "items": [{"product_id":"SKU-002","name":"Mouse","quantity":1,"price":29.99}]
+  }' | jq
