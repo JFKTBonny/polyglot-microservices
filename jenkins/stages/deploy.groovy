@@ -20,91 +20,128 @@ def execute() {
         [name: 'ui-service',           image: 'santonix/ui-service']
     ]
 
-    stage('Verify Cluster') {
-        writeFile file: 'verify-cluster.sh', text: """#!/bin/bash
+   stage('Verify Cluster') {
+
+        writeFile file: 'verify.sh', text: """#!/bin/bash
     set -e
 
-    NAMESPACE="${namespace}"
+    kubectl cluster-info
 
-    echo "kubectl version:"
-    kubectl version --client
+    kubectl get ns ${namespace} >/dev/null 2>&1 || \\
+    kubectl create ns ${namespace}
 
-    echo ""
-    echo "Cluster info:"
-    kubectl cluster-info --request-timeout=10s || echo "WARNING: Cannot reach cluster"
-
-    echo ""
-    echo "Namespace check:"
-    kubectl get namespace "\$NAMESPACE" >/dev/null 2>&1 || {
-        echo "Creating namespace \$NAMESPACE..."
-        kubectl create namespace "\$NAMESPACE" || echo "Namespace may already exist"
-    }
-
-    echo ""
-    echo "Nodes:"
-    kubectl get nodes || echo "WARNING: Cannot list nodes"
-    minikube addons enable ingress || echo "WARNING: Cannot enable ingress addon"
+    kubectl get nodes
     """
-        sh 'chmod +x verify-cluster.sh && ./verify-cluster.sh'
-    }
 
+        sh 'bash verify.sh'
+    }
 
     // ############## Find and Deploy manifests ####################################################
-    stage('Find and Deploy manifests') {
-
-    def serviceNames = services.collect { it.name }.join(' ')
-    def serviceImages = services.collect { "${it.name}=${it.image}" }.join(' ')
+    stage('Deploy') {
 
         writeFile file: 'deploy.sh', text: """#!/bin/bash
     set -e
 
     NAMESPACE="${namespace}"
 
-    declare -A IMAGES
-    for pair in ${serviceImages}; do
-        key=\${pair%%=*}
-        value=\${pair#*=}
-        IMAGES[\$key]=\$value
+    SERVICES=(
+    "user-service"
+    "order-service"
+    "inventory-service"
+    "payment-service"
+    "analytics-service"
+    "auth-service"
+    "notification-service"
+    "api-gateway"
+    "ui-service"
+    )
+
+    echo "Applying configmaps..."
+
+    for FILE in feature/k8s/configmaps/*.yaml; do
+        [ -f "\$FILE" ] || continue
+        kubectl apply -n "\$NAMESPACE" -f "\$FILE"
     done
 
-    SERVICES="${serviceNames}"
+    echo "Applying secrets..."
 
-    for SVC in \$SERVICES; do
-        IMAGE=\${IMAGES[\$SVC]}
+    for FILE in feature/k8s/secrets/*.yaml; do
+        [ -f "\$FILE" ] || continue
+        kubectl apply -n "\$NAMESPACE" -f "\$FILE"
+    done
 
-        echo "Processing \$SVC..."
+    echo "Deploying services..."
 
-        kubectl get namespace "\$NAMESPACE" >/dev/null 2>&1 || \\
-            kubectl create namespace "\$NAMESPACE"
+    for SVC in "\${SERVICES[@]}"; do
 
-        echo "Applying configmaps..."
-        
-        kubectl apply -f feature/k8s/configmaps/ -n "\$NAMESPACE"  --validate=false || true
-
-        echo "Applying secrets..."
-        
-        kubectl apply -f feature/k8s/secrets/ -n "\$NAMESPACE"  || true
-
-        MANIFEST=\$(find feature/k8s/ -name "*.yaml" -path "*\$SVC*" | head -1)
-
-        if [ -z "\$MANIFEST" ]; then
-            echo "No manifest found for \$SVC ⚠️"
+        if [ ! -d "feature/k8s/\$SVC" ]; then
+            echo "No manifests for \$SVC"
             continue
         fi
 
-        kubectl apply -f "\$MANIFEST" -n "\$NAMESPACE"
+        echo "Deploying \$SVC..."
 
-        kubectl get deployment "\$SVC" -n "\$NAMESPACE" 
-            
-        
+        find feature/k8s/\$SVC -name "*.yaml" \\
+            -exec kubectl apply -n "\$NAMESPACE" -f {} \\;
 
-        echo "Done \$SVC ✅"
     done
     """
-        sh 'chmod +x deploy.sh && ./deploy.sh'
-    }
-       
 
+        sh 'bash deploy.sh'
+    }
+
+    // ############## Rollout and Status ####################################################
+    stage('Rollout and Status') {
+
+        writeFile file: 'rollout.sh', text: """#!/bin/bash
+
+    NAMESPACE="${namespace}"
+
+    SERVICES=(
+    "user-service"
+    "order-service"
+    "inventory-service"
+    "payment-service"
+    "analytics-service"
+    "auth-service"
+    "notification-service"
+    "api-gateway"
+    "ui-service"
+    )
+
+    for SVC in "\${SERVICES[@]}"; do
+
+        echo "Waiting for \$SVC..."
+
+        kubectl rollout status deployment/\$SVC \\
+            -n "\$NAMESPACE" \\
+            --timeout=120s || true
+
+    done
+
+    echo ""
+    echo "════ Deployments ════"
+    kubectl get deployments -n "\$NAMESPACE"
+
+    echo ""
+    echo "════ Pods ════"
+    kubectl get pods -n "\$NAMESPACE"
+
+    echo ""
+    echo "════ Services ════"
+    kubectl get svc -n "\$NAMESPACE"
+
+    echo ""
+    echo "════ Ingress ════"
+    kubectl get ingress -n "\$NAMESPACE" || true
+    """
+
+        sh 'bash rollout.sh'
+    }
+
+    echo "Stage 13 complete - deployment done"
+}    
+return this
      
     
 
@@ -114,62 +151,5 @@ def execute() {
 
    
 
-    stage('Deployment Status') {
 
-        writeFile file: 'status.sh', text: """#!/bin/bash
-
-    NAMESPACE="${namespace}"
-
-    echo "════ Deployments ════"
-    sleep 30
-    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
-    kubectl get deployments -n "\$NAMESPACE" -o wide || echo "No deployments"
-
-    echo ""
-    echo "════ Pods ════"
-    kubectl get pods -n "\$NAMESPACE" -o wide || echo "No pods"
-
-    echo ""
-    echo "════ Services ════"
-    kubectl get services -n "\$NAMESPACE" || echo "No services"
-
-    echo ""
-    echo "════ Ingress ════"
-    kubectl get all -n ingress-nginx || echo "No ingress-nginx"
-    kubectl get ingress -n "\$NAMESPACE" || echo "No ingress"
-    """
-        sh 'chmod +x status.sh && ./status.sh'
-
-    }
-
-
-
-     stage('Wait for Rollout') {
-
-    def serviceNames = services.collect { it.name }.join(' ')
-    def timeout = 120
-
-        writeFile file: 'rollout.sh', text: """#!/bin/bash
-
-    NAMESPACE="${namespace}"
-    TIMEOUT=${timeout}
-    SERVICES="${serviceNames}"
-
-    for SVC in \$SERVICES; do
-        if kubectl get deployment "\$SVC" -n "\$NAMESPACE" >/dev/null 2>&1; then
-            echo "Waiting for \$SVC..."
-            kubectl rollout status deployment/"\$SVC" \\
-                -n "\$NAMESPACE" \\
-                --timeout="\${TIMEOUT}s" || \\
-                echo "WARNING: \$SVC rollout failed"
-        else
-            echo "\$SVC not found - skipping"
-        fi
-    done
-    """
-        sh 'chmod +x rollout.sh && ./rollout.sh'
-    }
-
-    echo "Stage 13 complete - deployment done"
-}    
-return this
+     
